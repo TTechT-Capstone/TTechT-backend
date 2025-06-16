@@ -16,5 +16,5 @@ import lombok.Setter;
 public class AuthenticatedResponse {
     private String token;
     private boolean isAuthenticated;
-    private Collection<? extends GrantedAuthority> authorities;
+    private String role;
 }

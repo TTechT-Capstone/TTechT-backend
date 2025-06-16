@@ -40,8 +40,11 @@ public class AuthServiceImpl implements AuthService {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         String token = jwtUtil.generateToken(userDetails);
-
-       return new AuthenticatedResponse(token, true, authentication.getAuthorities());
+        String role = userDetails.getAuthorities().stream()
+            .findFirst()
+            .map(grantedAuthority -> grantedAuthority.getAuthority())
+            .orElse(RoleEnum.USER.name()); // Default to USER if no role is found
+       return new AuthenticatedResponse(token, true, role);
    }
 
    @Override

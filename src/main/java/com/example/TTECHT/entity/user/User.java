@@ -1,8 +1,5 @@
 package com.example.TTECHT.entity.user;
 
-
-import java.time.LocalDateTime;
-
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -10,26 +7,27 @@ import com.example.TTECHT.enumuration.RoleEnum;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "user")
+@Table(name = "users") // Changed to plural form (common convention)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="username", unique = true)
-    private String username ;
+    @Column(name="username", unique = true, nullable = false)
+    private String username;
 
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-    @Column(name = "password")
+    @Column(name = "password", nullable = false)
     private String password;
 
     @Column(name = "first_name")
@@ -45,18 +43,17 @@ public class User {
     private String address;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role")
+    @Column(name = "role", nullable = false)
     private RoleEnum role;
 
-    // optiona: is_active
-    @Column(name = "is_active")
-    private boolean isActive;
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 
-    @Column(name = "create_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
-    @Column(name = "update_at")
+    @Column(name = "updated_at")
     @UpdateTimestamp
-    private LocalDateTime updateAt;
+    private LocalDateTime updatedAt;
 }
