@@ -1,5 +1,8 @@
 package com.example.TTECHT.service.impl;
 
+import com.example.TTECHT.dto.request.LogoutRequest;
+import com.example.TTECHT.dto.request.RefreshRequest;
+import com.example.TTECHT.service.TokenBlacklistService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,6 +16,7 @@ import com.example.TTECHT.enumuration.RoleEnum;
 import com.example.TTECHT.repository.user.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,8 +34,9 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklistService;
 
-   @Override
+    @Override
    public AuthenticatedResponse login(AuthenticatedRequest loginRequest) {
          // Authenticate the user using the provided credentials
         Authentication authentication = authenticationManager.authenticate(
@@ -76,4 +81,68 @@ public class AuthServiceImpl implements AuthService {
        userRepository.save(user);
        return "User registered successfully";
    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        try {
+            String token = request.getToken();
+
+            // Validate token is present
+            if (token == null || token.isEmpty()) {
+                throw new RuntimeException("Token is required for logout");
+            }
+
+            // Remove "Bearer " prefix if present
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+
+            // Validate the token
+            if (!jwtUtil.validateToken(token)) {
+                throw new RuntimeException("Invalid or expired token");
+            }
+
+            // Extract token information
+            String jti = jwtUtil.extractClaim(token, claims -> claims.get("jti", String.class));
+            Date expiration = jwtUtil.extractExpiration(token);
+
+
+            if (jti != null) {
+                tokenBlacklistService.blacklistToken(jti, expiration);
+            } else {
+
+                tokenBlacklistService.blacklistToken(token, expiration);
+            }
+
+            // Optional: Log the logout event
+            String username = jwtUtil.extractUsername(token);
+            System.out.println("User " + username + " logged out successfully");
+
+        } catch (RuntimeException e) {
+            throw e; // Re-throw runtime exceptions as-is
+        } catch (Exception e) {
+            throw new RuntimeException("Logout failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public AuthenticatedResponse refreshToken(RefreshRequest request) {
+        try {
+            String token = request.getToken();
+
+            // Validate the token
+            if (!jwtUtil.validateToken(token)) {
+                throw new RuntimeException("Invalid or expired token");
+            }
+
+            // Generate a new token
+            UserDetails userDetails = jwtUtil.extractUserDetails(token);
+            String newToken = jwtUtil.generateToken(userDetails);
+
+            // Return the new token in the response
+            return new AuthenticatedResponse(newToken, true, userDetails.getAuthorities().toString());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to refresh token: " + e.getMessage(), e);
+        }
+    }
 }

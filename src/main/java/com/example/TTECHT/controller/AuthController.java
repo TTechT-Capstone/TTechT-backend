@@ -1,7 +1,15 @@
 package com.example.TTECHT.controller;
 
+import com.example.TTECHT.dto.request.LogoutRequest;
+import com.example.TTECHT.dto.request.RefreshRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.ValidationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,44 +23,61 @@ import com.example.TTECHT.service.AuthService;
 
 import lombok.RequiredArgsConstructor;
 
+import javax.security.auth.login.AccountLockedException;
+
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
-    
-    @Autowired
-    private AuthService authService;
+
+    private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthenticatedRequest loginRequest) {
+    public ResponseEntity<AuthenticatedResponse> login(@RequestBody AuthenticatedRequest loginRequest) {
         try {
             AuthenticatedResponse response = authService.login(loginRequest);
-            System.out.println(response);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(401).body("Login failed: " + e.getMessage());
+            System.out.println("Exception: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new AuthenticatedResponse("Login failed: " + e.getMessage(), false, null));
         }
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterUserRequest registerRequest) {
+    public ResponseEntity<AuthenticatedResponse> register(@RequestBody RegisterUserRequest registerRequest) {
         try {
             authService.register(registerRequest);
-            return ResponseEntity.ok("User registered successfully");
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new AuthenticatedResponse("User registered successfully", true, null));
         } catch (Exception e) {
-            return ResponseEntity.status(400).body("Registration failed: " + e.getMessage());
+            System.out.println("Exception: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new AuthenticatedResponse("Registration failed: " + e.getMessage(), false, null));
         }
     }
-    
-    // @PostMapping("/logout")
-    // public ResponseEntity<?> logout() {
-    //     try {
-    //         authService.logout();
-    //         return ResponseEntity.ok("User logged out successfully");
-    //     } catch (Exception e) {
-    //         return ResponseEntity.status(500).body("Logout failed: " + e.getMessage());
-    //     }
-    // }
 
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(@RequestBody LogoutRequest logoutRequest) {
+        try {
+            authService.logout(logoutRequest);
+            return ResponseEntity.ok("User logged out successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Logout failed: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthenticatedResponse> refreshToken(@RequestBody RefreshRequest refreshRequest) {
+        try {
+            AuthenticatedResponse response = authService.refreshToken(refreshRequest);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new AuthenticatedResponse("Token refresh failed: " + e.getMessage(), false, null));
+        }
+    }
 }

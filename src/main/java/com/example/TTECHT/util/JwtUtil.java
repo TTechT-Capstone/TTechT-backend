@@ -4,10 +4,12 @@ package com.example.TTECHT.util;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,6 +66,15 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public UserDetails extractUserDetails(String token) {
+        Claims claims = extractAllClaims(token);
+        return new User(
+                claims.getSubject(),
+                "",
+                new ArrayList<>()
+        );
     }
     
     public Boolean validateToken(String token, UserDetails userDetails) {
