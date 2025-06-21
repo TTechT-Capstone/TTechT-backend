@@ -3,6 +3,7 @@ package com.example.TTECHT.controller.user;
 import com.example.TTECHT.dto.repsonse.SellerResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
 import com.example.TTECHT.dto.request.SellerCreationRequest;
+import com.example.TTECHT.dto.request.SellerUpdateRequest;
 import com.example.TTECHT.service.SellerService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -35,6 +36,32 @@ public class SellerController {
     public ApiResponse<SellerResponse> getSeller(@PathVariable Long sellerId) {
         return ApiResponse.<SellerResponse>builder()
                 .result(sellerService.getSeller(sellerId))
+                .build();
+    }
+
+    @PutMapping("/{sellerId}")
+    public ApiResponse<SellerResponse> updateSeller(
+            @PathVariable Long sellerId,
+            @RequestBody @Valid SellerUpdateRequest request) {
+
+        log.info("Updating seller with ID: {}", sellerId);
+        log.debug("Update request: {}", request);
+
+        return ApiResponse.<SellerResponse>builder()
+                .result(sellerService.updateSeller(sellerId, request))
+                .build();
+    }
+
+    @PutMapping("/user/{userId}")
+    public ApiResponse<SellerResponse> updateSellerByUserId(
+            @PathVariable Long userId,
+            @RequestBody @Valid SellerUpdateRequest request) {
+
+        log.info("Updating seller for user ID: {}", userId);
+        log.debug("Update request: {}", request);
+
+        return ApiResponse.<SellerResponse>builder()
+                .result(sellerService.updateSellerByUserId(userId, request))
                 .build();
     }
 

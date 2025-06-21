@@ -21,6 +21,7 @@ public enum ErrorCode {
     SELLER_NOT_FOUND(1012, "Seller not found", HttpStatus.NOT_FOUND),
     STORE_NAME_ALREADY_EXISTS(1013, "Store name already exists", HttpStatus.BAD_REQUEST),
     SELLER_CREATION_FAILED(1014, "Failed to create seller", HttpStatus.INTERNAL_SERVER_ERROR),
+    SELLER_UPDATE_FAILED(1013, "Failed to update seller", HttpStatus.INTERNAL_SERVER_ERROR),
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {
