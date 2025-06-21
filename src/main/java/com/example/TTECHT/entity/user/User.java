@@ -1,59 +1,60 @@
 package com.example.TTECHT.entity.user;
 
+import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
-import com.example.TTECHT.enumuration.RoleEnum;
 
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
-@Getter
-@Setter
-@AllArgsConstructor
+@Data
+@Builder
 @NoArgsConstructor
-@Table(name = "users") // Changed to plural form (common convention)
+@AllArgsConstructor
+@Table(name = "users")
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    Long id;
 
-    @Column(name="username", unique = true, nullable = false)
-    private String username;
+    @Column(name="username", unique = true)
+    String username;
 
-    @Column(name = "email", unique = true, nullable = false)
-    private String email;
+    @Column(name = "email", unique = true)
+    String email;
 
-    @Column(name = "password", nullable = false)
-    private String password;
+    @Column(name = "password")
+    String password;
 
     @Column(name = "first_name")
-    private String firstName;
+    String firstName;
 
     @Column(name = "last_name")
-    private String lastName;
+    String lastName;
 
     @Column(name = "phone_number", unique = true)
-    private String phoneNumber;
+    String phoneNumber;
 
     @Column(name = "address")
-    private String address;
+    String address;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private RoleEnum role;
+    @ManyToMany
+    @Column(name = "role")
+    Set<Role> roles;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
+    @Column(name = "is_active")
+    boolean isActive = true;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", updatable = false)
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    LocalDateTime updatedAt;
 }
