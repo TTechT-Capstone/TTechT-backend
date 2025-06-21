@@ -7,10 +7,10 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "sellers")
+
 public class Seller {
-    
     @Id
-    @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
@@ -23,5 +23,4 @@ public class Seller {
 
     @Column(name = "store_description")
     private String storeDescription;
-    
 }
