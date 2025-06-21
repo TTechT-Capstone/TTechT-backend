@@ -60,8 +60,16 @@ public class UserController {
 
     @PutMapping("/{userId}")
     ApiResponse<UserResponse> updateUser(@PathVariable String userId, @RequestBody UserUpdateRequest request) {
+        log.info("Updating user with ID: {}", userId);
+        System.out.println(request.toString());
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUser(userId, request))
                 .build();
+    }
+
+    @PutMapping("/inactivate/{userId}")
+    ApiResponse<String> inactivateUser(@PathVariable String userId) {
+        userService.inActivateUser(userId);
+        return ApiResponse.<String>builder().result("User has been inactivated").build();
     }
 }

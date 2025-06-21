@@ -22,13 +22,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    @Column(name="username", unique = true, nullable = false)
+    @Column(name="username", unique = true)
     String username;
 
-    @Column(name = "email", unique = true, nullable = false)
+    @Column(name = "email", unique = true)
     String email;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     String password;
 
     @Column(name = "first_name")
@@ -44,13 +44,13 @@ public class User {
     String address;
 
     @ManyToMany
-    @Column(name = "role", nullable = false)
+    @Column(name = "role")
     Set<Role> roles;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active")
     boolean isActive = true;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", updatable = false)
     @CreationTimestamp
     LocalDateTime createdAt;
 

@@ -39,7 +39,7 @@ public class RoleServiceImpl implements RoleService {
         return roleRepository.findAll().stream().map(roleMapper::toRoleResponse).toList();
     }
 
-    public void delete(String role) {
-        roleRepository.deleteById(role);
+    public void delete(Long roleID) {
+        roleRepository.deleteById(roleID);
     }
 }

@@ -16,6 +16,5 @@ public class UserResponse {
     String username;
     String firstName;
     String lastName;
-    // should be a list of roles
     List<RoleResponse> roles;
 }

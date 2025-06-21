@@ -1,9 +1,6 @@
 package com.example.TTECHT.entity.user;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.util.Set;
@@ -16,7 +13,11 @@ import java.util.Set;
 @Entity
 @Table(name = "roles")
 public class Role {
+
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
+
     String name;
     String description;
 

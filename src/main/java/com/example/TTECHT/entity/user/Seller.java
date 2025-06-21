@@ -15,10 +15,10 @@ public class Seller {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "user_id",unique = true)
     private User user;
 
-    @Column(name = "store_name", nullable = false)
+    @Column(name = "store_name")
     private String storeName;
 
     @Column(name = "store_description")

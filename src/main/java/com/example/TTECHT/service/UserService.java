@@ -13,4 +13,5 @@ public interface UserService {
     void deleteUser(String userId);
     List<UserResponse> getUsers();
     UserResponse getUser(String id);
+    void inActivateUser(String userId);
 }

@@ -42,7 +42,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
         HashSet<Role> roles = new HashSet<>();
-        roleRepository.findById(PredefinedRole.USER_ROLE).ifPresent(roles::add);
+        roleRepository.findByName(PredefinedRole.USER_ROLE).ifPresent(roles::add);
 
         user.setRoles(roles);
 
@@ -64,18 +64,61 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
-    @PostAuthorize("returnObject.username == authentication.name")
-    public UserResponse updateUser(String userId, UserUpdateRequest request) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+//    @PostAuthorize("returnObject.username == authentication.name")
+//    public UserResponse updateUser(String userId, UserUpdateRequest request) {
+//        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+//
+//        System.out.println(request.toString());
+//        userMapper.updateUser(user, request);
+//        user.setPassword(passwordEncoder.encode(request.getPassword()));
+//
+//        var roles = roleRepository.findByNameIn(request.getRoles());
+//        user.setRoles(new HashSet<>(roles));
+//
+//        return userMapper.toUserResponse(userRepository.save(user));
+//    }
+public UserResponse updateUser(String userId, UserUpdateRequest request) {
+    try {
+        log.info("Updating user with ID: {}", userId);
+        log.info("Update request: {}", request.toString());
 
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // 2. Update basic fields via mapper
         userMapper.updateUser(user, request);
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        var roles = roleRepository.findAllById(request.getRoles());
-        user.setRoles(new HashSet<>(roles));
+        // 3. Handle password update (only if provided)
+        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
 
-        return userMapper.toUserResponse(userRepository.save(user));
+        // 4. Handle roles update (only if provided)
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            var roles = roleRepository.findByNameIn(request.getRoles());
+
+            // Check if all requested roles were found
+            if (roles.size() != request.getRoles().size()) {
+                log.warn("Some roles not found. Requested: {}, Found: {}",
+                        request.getRoles(), roles.stream().map(Role::getName).toList());
+            }
+
+            user.setRoles(new HashSet<>(roles));
+        }
+
+        // 5. Save and return
+        User savedUser = userRepository.save(user);
+        return userMapper.toUserResponse(savedUser);
+
+    } catch (NumberFormatException e) {
+        log.error("Invalid user ID format: {}", userId);
+        throw new AppException(ErrorCode.INVALID_USER_ID);
+    } catch (Exception e) {
+        log.error("Error updating user with ID: {}", userId, e);
+        throw new AppException(ErrorCode.UPDATE_USER_FAILED);
     }
+}
 
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteUser(String userId) {
