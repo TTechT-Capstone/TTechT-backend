@@ -15,7 +15,10 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ProductCreateDTO {
 
-    @NotNull(message = "StoreName ID is required")
+    @NotNull(message = "User ID is required")
+    private Long userId;
+
+    @NotNull(message = "StoreName is required")
     private String storeName;
     
     @NotNull(message = "Category ID is required")

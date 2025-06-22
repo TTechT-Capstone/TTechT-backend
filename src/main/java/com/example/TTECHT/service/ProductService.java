@@ -18,7 +18,7 @@ public interface ProductService {
 
     ProductDTO getProductById(Long id);
 
-    ProductDTO createProduct(ProductCreateDTO productCreateDTO);
+    ProductDTO createProduct(ProductCreateDTO productCreateDTO, String sellerUsername);
 
     ProductDTO updateProduct(Long id, ProductCreateDTO productCreateDTO);
 
@@ -35,7 +35,6 @@ public interface ProductService {
     ProductDTO updateStock(Long id, Integer newStock);
 
     List<ProductDTO> getProductsByCategory(Long categoryId);
-
 //    List<ProductDTO> getProductsByCategory(Long categoryId);
 //
 //    List<String> getAllCategories();

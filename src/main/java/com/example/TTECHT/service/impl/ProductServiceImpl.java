@@ -4,7 +4,9 @@ import com.example.TTECHT.dto.ProductCreateDTO;
 import com.example.TTECHT.dto.ProductDTO;
 import com.example.TTECHT.entity.Category;
 import com.example.TTECHT.entity.Product;
+import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.repository.ProductRepository;
+import com.example.TTECHT.repository.user.UserRepository;
 import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,8 +45,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public ProductDTO createProduct(ProductCreateDTO productCreateDTO) {
+    public ProductDTO createProduct(ProductCreateDTO productCreateDTO, String sellerUsername) {
         Category category = categoryService.findEntityById(productCreateDTO.getCategoryId());
+        User seller = userRepository.findById(productCreateDTO.getUserId())
+                .orElseThrow(() -> new RuntimeException("Seller not found: " + sellerUsername));
 
         Product product = new Product();
         product.setStoreName(productCreateDTO.getStoreName());
@@ -52,6 +57,7 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
+        product.setSeller(seller);
 
         Product savedProduct = productRepository.save(product);
         return convertToDTO(savedProduct);
@@ -187,6 +193,10 @@ public class ProductServiceImpl implements ProductService {
         dto.setDescription(product.getDescription());
         dto.setPrice(product.getPrice());
         dto.setStockQuantity(product.getStockQuantity());
+        if (product.getSeller() != null) {
+            dto.setSellerUsername(product.getSeller().getUsername());
+            dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
+        }
         dto.setCreatedAt(product.getCreatedAt());
         return dto;
     }

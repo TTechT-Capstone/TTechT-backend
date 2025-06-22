@@ -6,6 +6,7 @@ import com.example.TTECHT.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -39,18 +40,20 @@ public class CategoryController {
     }
     
     /**
-     * 3. POST /api/categories - Create new category
+     * 3. POST /api/categories - Create new category (ADMIN only)
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryDTO> createCategory(@Valid @RequestBody CategoryCreateDTO categoryCreateDTO) {
         CategoryDTO createdCategory = categoryService.createCategory(categoryCreateDTO);
         return ResponseEntity.status(201).body(createdCategory);
     }
     
     /**
-     * 4. PUT /api/categories/{id} - Update existing category
+     * 4. PUT /api/categories/{id} - Update existing category (ADMIN only)
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryDTO> updateCategory(
             @PathVariable Long id, 
             @Valid @RequestBody CategoryCreateDTO categoryCreateDTO) {
@@ -59,9 +62,10 @@ public class CategoryController {
     }
     
     /**
-     * 5. DELETE /api/categories/{id} - Delete category
+     * 5. DELETE /api/categories/{id} - Delete category (ADMIN only)
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> deleteCategory(@PathVariable Long id) {
         categoryService.deleteCategory(id);
         

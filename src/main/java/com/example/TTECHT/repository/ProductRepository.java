@@ -1,6 +1,7 @@
 package com.example.TTECHT.repository;
 
 import com.example.TTECHT.entity.Product;
+import com.example.TTECHT.entity.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -35,4 +36,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     @Query("SELECT COUNT(p) FROM Product p WHERE p.category.categoryId = :categoryId")
     long countByCategoryId(@Param("categoryId") Long categoryId);
+    
+    List<Product> findBySeller(User seller);
 }

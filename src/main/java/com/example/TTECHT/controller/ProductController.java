@@ -10,6 +10,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -19,6 +21,15 @@ import java.util.Map;
 
 
 import java.util.*;
+
+/**
+ * Product Controller with integrated authentication and authorization
+ * 
+ * Access Control:
+ * - GET operations: Public access (anyone can view products)
+ * - POST operations: SELLER or ADMIN roles required
+ * - PUT/PATCH/DELETE operations: Product owner (SELLER) or ADMIN required
+ */
 
 @RestController
 @RequestMapping("/api/products")
@@ -61,8 +72,11 @@ public class ProductController {
      * 3. POST /api/products - Create new product
      */
     @PostMapping
-    public ResponseEntity<ProductDTO> createProduct(@Valid @RequestBody ProductCreateDTO productCreateDTO) {
-        ProductDTO createdProduct = productService.createProduct(productCreateDTO);
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    public ResponseEntity<ProductDTO> createProduct(
+            @Valid @RequestBody ProductCreateDTO productCreateDTO,
+            Authentication authentication) {
+        ProductDTO createdProduct = productService.createProduct(productCreateDTO, authentication.getName());
         return ResponseEntity.status(201).body(createdProduct);
     }
 
@@ -70,9 +84,11 @@ public class ProductController {
      * 4. PUT /api/products/{id} - Update existing product
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('SELLER'))")
     public ResponseEntity<ProductDTO> updateProduct(
             @PathVariable Long id,
-            @Valid @RequestBody ProductCreateDTO productCreateDTO) {
+            @Valid @RequestBody ProductCreateDTO productCreateDTO,
+            Authentication authentication) {
 
         ProductDTO updatedProduct = productService.updateProduct(id, productCreateDTO);
         return ResponseEntity.ok(updatedProduct);
@@ -82,7 +98,10 @@ public class ProductController {
      * 5. DELETE /api/products/{id} - Delete product
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteProduct(@PathVariable Long id) {
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('SELLER'))")
+    public ResponseEntity<Map<String, Object>> deleteProduct(
+            @PathVariable Long id, 
+            Authentication authentication) {
         productService.deleteProduct(id);
 
         Map<String, Object> response = new HashMap<>();
@@ -137,9 +156,11 @@ public class ProductController {
      * 10. PATCH /api/products/{id}/stock - Update product stock quantity
      */
     @PatchMapping("/{id}/stock")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('SELLER'))")
     public ResponseEntity<ProductDTO> updateStock(
             @PathVariable Long id,
-            @RequestParam Integer stockUpdate) {
+            @RequestParam Integer stockUpdate,
+            Authentication authentication) {
 
         ProductDTO updatedProduct = productService.updateStock(id, stockUpdate);
         return ResponseEntity.ok(updatedProduct);
