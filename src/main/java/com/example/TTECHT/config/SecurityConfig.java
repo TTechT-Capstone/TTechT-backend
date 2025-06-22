@@ -32,6 +32,8 @@ public class SecurityConfig {
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/roles/all",
+            "/api/products", "/api/products/**",
+            "/api/categories", "/api/categories/**"
     };
 
     private final CustomJwtDecoder customJwtDecoder;
@@ -42,12 +44,14 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS)
-                .permitAll()
-                .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS)
-                .permitAll()
-                .anyRequest()
-                .authenticated());
+        httpSecurity.authorizeHttpRequests(request -> request
+                .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/products", "/api/categories").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/products/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**").authenticated()
+                .anyRequest().authenticated());
         httpSecurity.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwtConfigurer -> jwtConfigurer
                         .decoder(customJwtDecoder)
                         .jwtAuthenticationConverter(jwtAuthenticationConverter()))
