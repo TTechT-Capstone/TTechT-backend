@@ -7,6 +7,7 @@ import com.example.TTECHT.dto.request.IntrospectRequest;
 import com.example.TTECHT.dto.request.LogoutRequest;
 import com.example.TTECHT.dto.request.RefreshRequest;
 import com.example.TTECHT.entity.token.InvalidatedToken;
+import com.example.TTECHT.entity.user.Role;
 import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.exception.AppException;
 import com.example.TTECHT.exception.ErrorCode;
@@ -88,8 +89,13 @@ public class AuthServiceImpl implements AuthService {
         }
 
         var token = generateToken(user);
+        String formatedRole = user.getRoles().stream()
+                .map(Role::getName)
+                .reduce((first, second) -> first + " " + second)
+                .orElse("");
         return AuthenticationResponse.builder()
                 .token(token)
+                .role(formatedRole)
                 .isAuthenticated(true).build();
     }
 
