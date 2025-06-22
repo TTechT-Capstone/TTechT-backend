@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.example.TTECHT.entity.user.User;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,6 +39,10 @@ public class Product {
     
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User seller;
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
