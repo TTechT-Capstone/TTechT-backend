@@ -44,6 +44,9 @@ public class Product {
     @JoinColumn(name = "seller_id", nullable = false)
     private User seller;
     
+    @Column(name = "sold_quantity", nullable = false)
+    private Integer soldQuantity = 0;
+    
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
     

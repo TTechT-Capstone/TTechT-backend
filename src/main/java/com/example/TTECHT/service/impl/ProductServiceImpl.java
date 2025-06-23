@@ -11,6 +11,7 @@ import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +48,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductDTO createProduct(ProductCreateDTO productCreateDTO, String sellerUsername) {
         Category category = categoryService.findEntityById(productCreateDTO.getCategoryId());
-        User seller = userRepository.findById(productCreateDTO.getUserId())
+        User seller = userRepository.findByUsername(sellerUsername)
                 .orElseThrow(() -> new RuntimeException("Seller not found: " + sellerUsername));
 
         Product product = new Product();
@@ -197,6 +198,7 @@ public class ProductServiceImpl implements ProductService {
             dto.setSellerUsername(product.getSeller().getUsername());
             dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
         }
+        dto.setSoldQuantity(product.getSoldQuantity());
         dto.setCreatedAt(product.getCreatedAt());
         return dto;
     }
@@ -227,5 +229,42 @@ public class ProductServiceImpl implements ProductService {
         map.put("stockQuantity", dto.getStockQuantity());
         map.put("createdAt", dto.getCreatedAt());
         return map;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getBestSellerProducts(int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findBestSellerProducts(pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getBestSellerProductsByCategory(Long categoryId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findBestSellerProductsByCategory(categoryId, pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getTopSellingProducts(int minSoldQuantity, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findProductsWithMinimumSales(minSoldQuantity, pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    private ProductDTO convertToBestSellerDTO(Product product) {
+        ProductDTO dto = convertToDTO(product);
+        dto.setSoldQuantity(product.getSoldQuantity());
+        dto.setIsBestSeller(product.getSoldQuantity() > 0);
+        return dto;
     }
 }

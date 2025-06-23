@@ -166,4 +166,33 @@ public class ProductController {
         return ResponseEntity.ok(updatedProduct);
     }
 
+    /**
+     * 11. GET /api/products/best-sellers - Get best selling products
+     */
+    @GetMapping("/best-sellers")
+    public ResponseEntity<List<ProductDTO>> getBestSellerProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> bestSellers = productService.getBestSellerProducts(limit);
+        return ResponseEntity.ok(bestSellers);
+    }
+    
+    /**
+     * 12. GET /api/products/best-sellers/category/{categoryId} - Get best sellers by category
+     */
+    @GetMapping("/best-sellers/category/{categoryId}")
+    public ResponseEntity<List<ProductDTO>> getBestSellersByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> bestSellers = productService.getBestSellerProductsByCategory(categoryId, limit);
+        return ResponseEntity.ok(bestSellers);
+    }
+
+//    @GetMapping("/top-selling")
+//    public ResponseEntity<List<ProductDTO>> getTopSellingProducts(
+//            @RequestParam(defaultValue = "5") int minSoldQuantity,
+//            @RequestParam(defaultValue = "20") int limit) {
+//        List<ProductDTO> topSelling = productService.getTopSellingProducts(minSoldQuantity, limit);
+//        return ResponseEntity.ok(topSelling);
+//    }
+
 }
