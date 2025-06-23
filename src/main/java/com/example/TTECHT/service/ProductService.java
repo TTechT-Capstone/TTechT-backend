@@ -35,6 +35,13 @@ public interface ProductService {
     ProductDTO updateStock(Long id, Integer newStock);
 
     List<ProductDTO> getProductsByCategory(Long categoryId);
+
+    List<ProductDTO> getBestSellerProducts(int limit);
+    
+    List<ProductDTO> getBestSellerProductsByCategory(Long categoryId, int limit);
+    
+    List<ProductDTO> getTopSellingProducts(int minSoldQuantity, int limit);
+
 //    List<ProductDTO> getProductsByCategory(Long categoryId);
 //
 //    List<String> getAllCategories();
