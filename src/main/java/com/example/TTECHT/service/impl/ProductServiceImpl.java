@@ -58,6 +58,12 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
         product.setSeller(seller);
 
         Product savedProduct = productRepository.save(product);
@@ -75,6 +81,9 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
 
         Product updatedProduct = productRepository.save(product);
         return convertToDTO(updatedProduct);
@@ -199,6 +208,9 @@ public class ProductServiceImpl implements ProductService {
             dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
         }
         dto.setSoldQuantity(product.getSoldQuantity());
+        dto.setColor(product.getColor());
+        dto.setBrand(product.getBrand());
+        dto.setSize(product.getSize());
         dto.setCreatedAt(product.getCreatedAt());
         return dto;
     }
@@ -213,6 +225,9 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", product.getDescription());
         map.put("price", product.getPrice());
         map.put("stockQuantity", product.getStockQuantity());
+        map.put("color", product.getColor());
+        map.put("brand", product.getBrand());
+        map.put("size", product.getSize());
         map.put("createdAt", product.getCreatedAt());
         return map;
     }
@@ -227,6 +242,9 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", dto.getDescription());
         map.put("price", dto.getPrice());
         map.put("stockQuantity", dto.getStockQuantity());
+        map.put("color", dto.getColor());
+        map.put("brand", dto.getBrand());
+        map.put("size", dto.getSize());
         map.put("createdAt", dto.getCreatedAt());
         return map;
     }

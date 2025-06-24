@@ -25,6 +25,9 @@ public class Category {
     @Column(name = "description")
     private String description;
     
+    @Column(name = "image_path")
+    private String imagePath;
+    
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Product> products;
 }
