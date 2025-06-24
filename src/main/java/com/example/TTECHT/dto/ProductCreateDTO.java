@@ -34,4 +34,12 @@ public class ProductCreateDTO {
     @NotNull(message = "Stock quantity is required")
     @PositiveOrZero(message = "Stock quantity must be zero or positive")
     private Integer stockQuantity;
+    
+    @NotBlank(message = "Color is required")
+    private String color;
+    
+    @NotBlank(message = "Brand is required")
+    private String brand;
+    
+    private String size; // Optional field
 }

@@ -22,6 +22,9 @@ public class ProductDTO {
     private String sellerUsername;
     private String sellerName;
     private Integer soldQuantity;
+    private String color;
+    private String brand;
+    private String size;
     private Boolean isBestSeller;
     private LocalDateTime createdAt;
 }
