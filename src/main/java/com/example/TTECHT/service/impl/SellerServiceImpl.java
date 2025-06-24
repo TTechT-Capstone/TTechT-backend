@@ -10,6 +10,7 @@ import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.exception.AppException;
 import com.example.TTECHT.exception.ErrorCode;
 import com.example.TTECHT.mapper.SellerMapper;
+import com.example.TTECHT.mapper.UserMapper;
 import com.example.TTECHT.repository.user.RoleRepository;
 import com.example.TTECHT.repository.user.SellerRepository;
 import com.example.TTECHT.repository.user.UserRepository;
@@ -20,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,35 +38,39 @@ public class SellerServiceImpl implements SellerService {
     UserRepository userRepository;
     SellerMapper sellerMapper;
     RoleRepository roleRepository;
+    PasswordEncoder passwordEncoder;
 
     @Transactional
     public SellerResponse createSeller(SellerCreationRequest request) {
-        log.info("Creating seller for user ID: {}", request.getUserId());
+        HashSet<Role> roles = new HashSet<>();
 
-        User user = userRepository.findById(request.getUserId().toString())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        roleRepository.findByName(PredefinedRole.SELLER_ROLE).ifPresent(roles::add);
 
-        if (sellerRepository.existsByUserId(request.getUserId())) {
-            log.warn("User {} is already a seller", request.getUserId());
-            throw new AppException(ErrorCode.USER_ALREADY_SELLER);
-        }
+        User user = User.builder()
+                .username(request.getUsername())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .phoneNumber(request.getPhoneNumber())
+                .roles(roles)
+                .isActive(true)
+                .build();
+
 
         if (sellerRepository.existsByStoreName(request.getStoreName())) {
             log.warn("Store name '{}' already exists", request.getStoreName());
             throw new AppException(ErrorCode.STORE_NAME_ALREADY_EXISTS);
         }
 
-        Set<Role> currentRoles = user.getRoles();
-        if (currentRoles == null) {
-            currentRoles = new HashSet<>();
-        }
+        userRepository.save(user);
 
-        roleRepository.findByName(PredefinedRole.SELLER_ROLE).ifPresent(currentRoles::add);
-
-        user.setRoles(currentRoles);
-
-        Seller seller = sellerMapper.toSeller(request);
-        seller.setUser(user);
+        // Create seller
+        Seller seller = Seller.builder()
+                .user(user)
+                .storeName(request.getStoreName())
+                .storeDescription(request.getStoreDescription())
+                .build();
 
         Seller savedSeller = sellerRepository.save(seller);
         log.info("Successfully created seller with ID: {}", savedSeller.getId());
