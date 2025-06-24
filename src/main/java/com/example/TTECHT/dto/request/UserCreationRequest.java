@@ -32,5 +32,8 @@ public class UserCreationRequest {
     @Email(message = "Email should be valid")
     private String email;
 
+    @NotBlank(message = "Phone number cannot be blank")
+    private String phoneNumber;
+
     // should consider the role for the account 
 }

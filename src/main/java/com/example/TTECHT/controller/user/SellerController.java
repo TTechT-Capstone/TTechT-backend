@@ -25,7 +25,6 @@ public class SellerController {
 
     @PostMapping
     public ApiResponse<SellerResponse> createSeller(@RequestBody @Valid SellerCreationRequest request) {
-        log.info("Creating seller for user ID: {}", request.getUserId());
 
         return ApiResponse.<SellerResponse>builder()
                 .result(sellerService.createSeller(request))

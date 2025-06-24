@@ -19,6 +19,7 @@ public interface UserMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "roles", ignore = true)
     @Mapping(target = "password", ignore = true)
+    @Mapping(target = "phoneNumber", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateUser(@MappingTarget User user, UserUpdateRequest userUpdateRequest);
 }

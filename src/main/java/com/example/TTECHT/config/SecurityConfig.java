@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
@@ -31,6 +32,7 @@ public class SecurityConfig {
             "/api/v1/auth/logout",
             "/api/v1/auth/refresh",
             "api/v1/roles",
+            "/api/v1/sellers"
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
@@ -46,8 +48,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.authorizeHttpRequests(request -> request
+    public SecurityFilterChain filterChain(HttpSecurity httpSecurity, CorsConfigurationSource corsConfigurationSource) throws Exception {
+        httpSecurity.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(request -> request
                 .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
                 .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/products", "/api/categories").authenticated()
@@ -78,30 +82,46 @@ public class SecurityConfig {
 //        return new CorsFilter(urlBasedCorsConfigurationSource);
 //    }
 
+//    @Bean
+//    public CorsFilter corsFilter() {
+//        CorsConfiguration corsConfiguration = new CorsConfiguration();
+//
+////        corsConfiguration.setAllowedOriginPatterns(List.of("*"));
+//         corsConfiguration.setAllowedOrigins(Arrays.asList(
+//             "http://localhost:3000"
+//         ));
+//
+//        corsConfiguration.setAllowedMethods(List.of("*"));
+//        corsConfiguration.setAllowedHeaders(List.of("*"));
+//
+//        // Add these important configurations
+//        corsConfiguration.setAllowCredentials(true);
+//        corsConfiguration.setMaxAge(3600L);
+//
+//        corsConfiguration.setExposedHeaders(Arrays.asList(
+//                "Authorization",
+//                "Content-Type",
+//                "X-Total-Count"
+//        ));
+//
+//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+//        source.registerCorsConfiguration("/**", corsConfiguration);
+//        return new CorsFilter(source);
+//    }
     @Bean
-    public CorsFilter corsFilter() {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-
-        corsConfiguration.setAllowedOriginPatterns(List.of("*"));
-
-        corsConfiguration.setAllowedMethods(List.of("*"));
+        corsConfiguration.setAllowedOrigins(List.of("http://localhost:3000"));
+        corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         corsConfiguration.setAllowedHeaders(List.of("*"));
-
-        // Add these important configurations:
         corsConfiguration.setAllowCredentials(true);
         corsConfiguration.setMaxAge(3600L);
-
-        corsConfiguration.setExposedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Total-Count"
-        ));
+        corsConfiguration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Total-Count"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfiguration);
-        return new CorsFilter(source);
+        return source;
     }
-
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
