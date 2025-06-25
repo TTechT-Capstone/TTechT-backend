@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @Table(name = "password_reset_tokens")
 @AllArgsConstructor
 @NoArgsConstructor
+@RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PasswordResetToken {
 
@@ -40,6 +41,12 @@ public class PasswordResetToken {
 
     @Column(name = "used")
     boolean used = false;
+
+    public PasswordResetToken(String token, User user, LocalDateTime expiryDate) {
+        this.token = token;
+        this.user = user;
+        this.expiryDate = expiryDate;
+    }
 
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDateTime.now());
