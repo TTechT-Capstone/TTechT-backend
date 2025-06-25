@@ -1,5 +1,7 @@
 package com.example.TTECHT.exception;
 
+import com.example.TTECHT.dto.request.ApiResponse;
+import com.example.TTECHT.entity.token.InvalidatedToken;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -54,5 +56,18 @@ public class GlobalExceptionHandler {
         error.put("message", "An unexpected error occurred");
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    // should be considered again
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidToken(InvalidTokenException invalidatedToken) {
+        return ResponseEntity.badRequest().body(ApiResponse.<Void>builder().message(invalidatedToken.getMessage()).build()
+        );
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyRequests(TooManyRequestsException tooManyRequestsException) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.<Void>builder().message(tooManyRequestsException.getMessage()).build());
     }
 }
