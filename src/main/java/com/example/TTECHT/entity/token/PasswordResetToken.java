@@ -5,48 +5,37 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.data.annotation.CreatedDate;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "password_reset_tokens")
 @Data
 @Builder
-@Getter
-@Setter
-@Table(name = "password_reset_tokens")
 @AllArgsConstructor
 @NoArgsConstructor
-@RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PasswordResetToken {
-
     @Id
-    @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    @Column(name = "token", unique = true)
+    @Column(name = "token", unique = true, nullable = false)
     String token;
 
-    // TODO: should add the nullable = false
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
     User user;
 
-    @Column(name = "expiry_date")
+    @Column(name = "expiry_date", nullable = false)
     LocalDateTime expiryDate;
 
     @CreationTimestamp
     LocalDateTime createdDate;
 
-    @Column(name = "used")
+    @Column(name = "used", nullable = false)
+    @Builder.Default
     boolean used = false;
-
-    public PasswordResetToken(String token, User user, LocalDateTime expiryDate) {
-        this.token = token;
-        this.user = user;
-        this.expiryDate = expiryDate;
-    }
 
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDateTime.now());

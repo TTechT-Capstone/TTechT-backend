@@ -63,7 +63,11 @@ public class PasswordResetServiceImpl implements PasswordResetService {
             String token = generateSecureToken();
 
             LocalDateTime expiryDate = LocalDateTime.now().plusHours(tokenValidityHours);
-            PasswordResetToken resetToken = new PasswordResetToken(token, user, expiryDate);
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .token(token)
+                    .user(user)
+                    .expiryDate(expiryDate)
+                    .build();
             passwordResetTokenRepository.save(resetToken);
 
             emailService.sendPasswordResetEmail(user.getEmail(), token, user.getFirstName());
