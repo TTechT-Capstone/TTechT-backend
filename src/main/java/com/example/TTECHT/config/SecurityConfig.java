@@ -32,13 +32,17 @@ public class SecurityConfig {
             "/api/v1/auth/logout",
             "/api/v1/auth/refresh",
             "api/v1/roles",
-            "/api/v1/sellers"
+            "/api/v1/sellers",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
+            "/api/v1/auth/validate-reset-token",
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/roles/all",
             "/api/products", "/api/products/**",
-            "/api/categories", "/api/categories/**"
+            "/api/categories", "/api/categories/**",
+            "/api/test/redis"
     };
 
     private final CustomJwtDecoder customJwtDecoder;
