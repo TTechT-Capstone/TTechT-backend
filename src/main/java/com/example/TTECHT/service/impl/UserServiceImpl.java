@@ -2,6 +2,7 @@ package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.constant.PredefinedRole;
 import com.example.TTECHT.dto.repsonse.UserResponse;
+import com.example.TTECHT.dto.request.UpdatePasswordRequest;
 import com.example.TTECHT.dto.request.UserCreationRequest;
 import com.example.TTECHT.dto.request.UserUpdateRequest;
 import com.example.TTECHT.entity.user.Role;
@@ -17,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -64,7 +64,7 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
-//    @PostAuthorize("returnObject.username == authentication.name")
+    //    @PostAuthorize("returnObject.username == authentication.name")
 //    public UserResponse updateUser(String userId, UserUpdateRequest request) {
 //        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 //
@@ -77,48 +77,63 @@ public class UserServiceImpl implements UserService {
 //
 //        return userMapper.toUserResponse(userRepository.save(user));
 //    }
-public UserResponse updateUser(String userId, UserUpdateRequest request) {
-    try {
-        log.info("Updating user with ID: {}", userId);
-        log.info("Update request: {}", request.toString());
+    public UserResponse updateUser(String userId, UserUpdateRequest request) {
+        try {
+            log.info("Updating user with ID: {}", userId);
+            log.info("Update request: {}", request.toString());
 
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        // 2. Update basic fields via mapper
-        userMapper.updateUser(user, request);
+            // 2. Update basic fields via mapper
+            userMapper.updateUser(user, request);
 
-        // 3. Handle password update (only if provided)
-        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
-
-        // 4. Handle roles update (only if provided)
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
-            var roles = roleRepository.findByNameIn(request.getRoles());
-
-            // Check if all requested roles were found
-            if (roles.size() != request.getRoles().size()) {
-                log.warn("Some roles not found. Requested: {}, Found: {}",
-                        request.getRoles(), roles.stream().map(Role::getName).toList());
+            // 3. Handle password update (only if provided)
+            if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
             }
 
-            user.setRoles(new HashSet<>(roles));
+            // 4. Handle roles update (only if provided)
+            if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+                var roles = roleRepository.findByNameIn(request.getRoles());
+
+                // Check if all requested roles were found
+                if (roles.size() != request.getRoles().size()) {
+                    log.warn("Some roles not found. Requested: {}, Found: {}",
+                            request.getRoles(), roles.stream().map(Role::getName).toList());
+                }
+
+                user.setRoles(new HashSet<>(roles));
+            }
+
+            // 5. Save and return
+            User savedUser = userRepository.save(user);
+            return userMapper.toUserResponse(savedUser);
+
+        } catch (NumberFormatException e) {
+            log.error("Invalid user ID format: {}", userId);
+            throw new AppException(ErrorCode.INVALID_USER_ID);
+        } catch (Exception e) {
+            log.error("Error updating user with ID: {}", userId, e);
+            throw new AppException(ErrorCode.UPDATE_USER_FAILED);
+        }
+    }
+
+    public void updatePassword(String userId, UpdatePasswordRequest request) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        if (request.getNewPassword() == null || request.getNewPassword().isBlank() || request.getConfirmNewPassword() == null || request.getConfirmNewPassword().isBlank()) {
+            throw new AppException(ErrorCode.PASSWORD_CANNOT_BE_BLANK);
         }
 
-        // 5. Save and return
-        User savedUser = userRepository.save(user);
-        return userMapper.toUserResponse(savedUser);
+        if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+            throw new AppException(ErrorCode.PASSWORDS_NOT_MATCH);
+        }
 
-    } catch (NumberFormatException e) {
-        log.error("Invalid user ID format: {}", userId);
-        throw new AppException(ErrorCode.INVALID_USER_ID);
-    } catch (Exception e) {
-        log.error("Error updating user with ID: {}", userId, e);
-        throw new AppException(ErrorCode.UPDATE_USER_FAILED);
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
-}
+
 
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteUser(String userId) {
