@@ -24,6 +24,7 @@ public enum ErrorCode {
     SELLER_UPDATE_FAILED(1013, "Failed to update seller", HttpStatus.INTERNAL_SERVER_ERROR),
     PASSWORD_CANNOT_BE_BLANK(1015, "Password cannot be blank", HttpStatus.BAD_REQUEST),
     PASSWORDS_NOT_MATCH(1016, "Passwords do not match", HttpStatus.BAD_REQUEST),
+    CART_NOT_FOUND(2001, "Cart not found", HttpStatus.NOT_FOUND),
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {
