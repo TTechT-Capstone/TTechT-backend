@@ -22,6 +22,8 @@ public enum ErrorCode {
     STORE_NAME_ALREADY_EXISTS(1013, "Store name already exists", HttpStatus.BAD_REQUEST),
     SELLER_CREATION_FAILED(1014, "Failed to create seller", HttpStatus.INTERNAL_SERVER_ERROR),
     SELLER_UPDATE_FAILED(1013, "Failed to update seller", HttpStatus.INTERNAL_SERVER_ERROR),
+    PASSWORD_CANNOT_BE_BLANK(1015, "Password cannot be blank", HttpStatus.BAD_REQUEST),
+    PASSWORDS_NOT_MATCH(1016, "Passwords do not match", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {
