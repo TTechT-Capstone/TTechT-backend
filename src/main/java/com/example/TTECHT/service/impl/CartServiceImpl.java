@@ -123,6 +123,7 @@ public class CartServiceImpl implements CartService {
         // apply the promotion code
         cart.setPromotionCode(promotionCode);
         cartRepository.save(cart);
+
     }
 
 }
