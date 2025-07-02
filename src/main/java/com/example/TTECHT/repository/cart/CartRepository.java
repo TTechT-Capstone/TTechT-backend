@@ -8,9 +8,6 @@ import java.util.Optional;
 
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long > {
-    // This class will handle the database operations related to Cart
-    // For example, creating a new cart, retrieving a cart by user ID, updating a cart, etc.
-    // It will interact with the database using JPA or any other ORM framework.
 
     // Methods to be implemented:
     // - createCart(CreateCartRequest request)
@@ -20,5 +17,5 @@ public interface CartRepository extends JpaRepository<Cart, Long > {
 
     Optional<Cart> findByUserId(Long userId);
     void deleteByUserId(Long userId);
-
+    void deleteById(Long cartId);
 }

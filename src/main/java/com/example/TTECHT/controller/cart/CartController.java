@@ -29,18 +29,13 @@ public class CartController {
                 .build();
     }
 
-    // Example method to add an item to the cart
-    public void addItemToCart(Long itemId, int quantity) {
-        // Logic to add item to cart
+    @GetMapping("/{userId}")
+    ApiResponse<CartResponse> getCart(@PathVariable String userId) {
+        // Logic to retrieve the cart for a specific user
+        log.info("Get cart for user: {}", userId);
+        return ApiResponse.<CartResponse>builder()
+                .result(cartService.getCart(userId))
+                .build();
     }
 
-    // Example method to remove an item from the cart
-    public void removeItemFromCart(Long itemId) {
-        // Logic to remove item from cart
-    }
-
-    // Example method to view the cart
-    public void viewCart() {
-        // Logic to view items in the cart
-    }
 }

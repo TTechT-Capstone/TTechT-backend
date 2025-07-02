@@ -3,9 +3,11 @@ package com.example.TTECHT.service.impl;
 import com.example.TTECHT.dto.repsonse.CartResponse;
 import com.example.TTECHT.dto.request.CartCreationRequest;
 import com.example.TTECHT.entity.cart.Cart;
+import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.exception.AppException;
 import com.example.TTECHT.exception.ErrorCode;
 import com.example.TTECHT.mapper.CartMapper;
+import com.example.TTECHT.repository.cart.CartItemRepository;
 import com.example.TTECHT.repository.cart.CartRepository;
 import com.example.TTECHT.repository.user.UserRepository;
 import com.example.TTECHT.service.CartService;
@@ -15,6 +17,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 
 @Service
@@ -26,6 +30,7 @@ public class CartServiceImpl implements CartService {
     CartRepository cartRepository;
     UserRepository userRepository;
     CartMapper cartMapper;
+    CartItemRepository cartItemRepository;
 
     @PreAuthorize("hasRole('USER')")
     public CartResponse createCart(String userId, CartCreationRequest request) {
@@ -75,11 +80,18 @@ public class CartServiceImpl implements CartService {
 
         // retrieve the cart for the user
         Cart cart = cartRepository.findByUserId(Long.valueOf(userId)).orElseThrow(() -> new AppException(ErrorCode.CART_NOT_FOUND));
-        return cartMapper.toCartResponse(cart);
+        List<CartItem> cartItems = cartItemRepository.findByCartId(cart.getId());
+
+        return CartResponse.builder().id(cart.getId()).promotionCode(cart.getPromotionCode()).cartItems(cartItems)
+                .userId(cart.getUser().getId())
+                .submittedTime(cart.getSubmittedTime())
+                .createdAt(cart.getCreatedAt())
+                .updatedAt(cart.getUpdatedAt())
+                .build();
     }
 
     @PreAuthorize("hasRole('USER')")
-    public void deleteCart(String userId) {
+    public void deleteCart(String userId, String cartId) {
         // check if the userId is valid
         if (userId == null || userId.isEmpty()) {
             log.error("Invalid userId: {}", userId);
@@ -87,11 +99,11 @@ public class CartServiceImpl implements CartService {
         }
 
         // delete the cart for the user
-        cartRepository.deleteByUserId(Long.valueOf(userId));
+        cartRepository.deleteById(Long.valueOf(cartId));
     }
 
     @PreAuthorize("hasRole('USER')")
-    public void clearCart(String userId) {
+    public void clearCart(String userId, String cartId) {
         // check if the userId is valid
         if (userId == null || userId.isEmpty()) {
             log.error("Invalid userId: {}", userId);
@@ -102,10 +114,7 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findByUserId(Long.valueOf(userId))
                 .orElseThrow(() -> new IllegalArgumentException("Cart not found for user"));
 
-//        cart.getItems().clear(); // Assuming Cart has a method to clear items
-        Cart cart = getCart(userId);
-        cart.getItems().clear(); // Assuming Cart has a method to clear items
-        cartRepository.save(cart);
+        cartItemRepository.deleteByCartId(Long.valueOf(cartId));
     }
 
     @PreAuthorize("hasRole('USER') || hasRole('ADMIN')")
@@ -123,7 +132,5 @@ public class CartServiceImpl implements CartService {
         // apply the promotion code
         cart.setPromotionCode(promotionCode);
         cartRepository.save(cart);
-
     }
-
 }

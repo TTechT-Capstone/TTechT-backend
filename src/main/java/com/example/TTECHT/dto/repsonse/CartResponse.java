@@ -1,10 +1,12 @@
 package com.example.TTECHT.dto.repsonse;
 
 
+import com.example.TTECHT.entity.cart.CartItem;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -16,6 +18,7 @@ public class CartResponse {
     Long userId;
     String promotionCode;
     LocalDateTime submittedTime;
+    List<CartItem> cartItems;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

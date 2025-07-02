@@ -1,12 +1,33 @@
 package com.example.TTECHT.controller.cart;
 
-public class CartItemController {
-    // This class will handle requests related to cart items
-    // For example, adding items to the cart, removing items, updating quantities, etc.
 
-    // Example method to add an item to the cart
-    public void addItemToCart(Long itemId, int quantity) {
-        // Logic to add item to the cart
+import com.example.TTECHT.dto.repsonse.CartItemResponse;
+import com.example.TTECHT.dto.request.ApiResponse;
+import com.example.TTECHT.dto.request.CartItemRequest;
+import com.example.TTECHT.service.CartItemService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/cartsItems")
+@RequiredArgsConstructor
+@FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
+@Slf4j
+public class CartItemController {
+
+    CartItemService cartItemService;
+
+    @PostMapping
+    ApiResponse<CartItemResponse> addItemToCart(@RequestBody @Valid CartItemRequest request) {
+        return ApiResponse.<CartItemResponse>builder()
+                .result(cartItemService.addItemToCart(request))
+                .build();
     }
 
     // Example method to remove an item from the cart
@@ -18,4 +39,5 @@ public class CartItemController {
     public void updateItemQuantity(Long itemId, int newQuantity) {
         // Logic to update item quantity in the cart
     }
+
 }
