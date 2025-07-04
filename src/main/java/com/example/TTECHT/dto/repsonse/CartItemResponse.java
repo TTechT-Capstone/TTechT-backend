@@ -11,6 +11,6 @@ import lombok.experimental.FieldDefaults;
 public class CartItemResponse {
     Long id;
     Long productId;
+    String productName;
     int quantity;
-
 }

@@ -18,7 +18,7 @@ public class CartResponse {
     Long userId;
     String promotionCode;
     LocalDateTime submittedTime;
-    List<CartItem> cartItems;
+    List<CartItemResponse> cartItems;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

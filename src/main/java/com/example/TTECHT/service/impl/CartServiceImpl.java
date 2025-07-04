@@ -1,5 +1,6 @@
 package com.example.TTECHT.service.impl;
 
+import com.example.TTECHT.dto.repsonse.CartItemResponse;
 import com.example.TTECHT.dto.repsonse.CartResponse;
 import com.example.TTECHT.dto.request.CartCreationRequest;
 import com.example.TTECHT.entity.cart.Cart;
@@ -78,16 +79,27 @@ public class CartServiceImpl implements CartService {
             throw new IllegalArgumentException("User does not exist");
         }
 
-        // retrieve the cart for the user
         Cart cart = cartRepository.findByUserId(Long.valueOf(userId)).orElseThrow(() -> new AppException(ErrorCode.CART_NOT_FOUND));
         List<CartItem> cartItems = cartItemRepository.findByCartId(cart.getId());
+        List<CartItemResponse> cartItemResponses = cartItems.stream()
+                .map(item -> CartItemResponse.builder()
+                        .id(item.getCartItemId())
+                        .productId(item.getProduct().getProductId())
+                        .productName(item.getProductName())
+                        .quantity(item.getQuantity())
+                        .build())
+                .toList();
 
-        return CartResponse.builder().id(cart.getId()).promotionCode(cart.getPromotionCode()).cartItems(cartItems)
+        return CartResponse.builder()
+                .id(cart.getId())
+                .promotionCode(cart.getPromotionCode())
+                .cartItems(cartItemResponses)
                 .userId(cart.getUser().getId())
                 .submittedTime(cart.getSubmittedTime())
                 .createdAt(cart.getCreatedAt())
                 .updatedAt(cart.getUpdatedAt())
                 .build();
+
     }
 
     @PreAuthorize("hasRole('USER')")
