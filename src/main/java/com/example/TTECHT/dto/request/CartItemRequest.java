@@ -14,6 +14,4 @@ public class CartItemRequest {
     private String cardId;
     private Long productId;
     private int quantity;
-
-
 }

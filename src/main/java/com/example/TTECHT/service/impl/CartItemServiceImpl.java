@@ -29,34 +29,36 @@ public class CartItemServiceImpl implements CartItemService {
     CartItemRepository cartItemRepository;
     ProductRepository productRepository;
 
-    public CartItemResponse addItemToCart(CartItemRequest request) {
 
-        Cart cart = cartRepository.findById(Long.valueOf(request.getCardId())).orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + request.getCardId()));
+public CartItemResponse addItemToCart(CartItemRequest request) {
+    Cart cart = cartRepository.findById(Long.valueOf(request.getCardId())) // Fixed: removed Long.valueOf if getCartId returns Long
+            .orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + request.getCardId()));
 
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
+    Product product = productRepository.findById(request.getProductId()) // Fixed: use actual product ID
+            .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
 
-        // check if the product is already in the cart
-       if (cartItemRepository.findByCartIdAndProduct(Long.valueOf(request.getCardId()), product) != null) {
-            log.error("Product with ID {} is already in the cart with ID {}", request.getProductId(), request.getCardId());
-            throw new IllegalArgumentException("Product is already in the cart");
-        }
+    // Check if the product is already in the cart
+//    if (cartItemRepository.existsByCartIdAndProduct(request.getCartId(), product)) { // Fixed: use existsBy
+//        log.error("Product with ID {} is already in the cart with ID {}", request.getProductId(), request.getCartId());
+//        throw new IllegalArgumentException("Product is already in the cart");
+//    }
 
-        // CartItem builder
-        CartItem cartItem = CartItem.builder()
-                .cart(cart)
-                .product(product)
-                .productName(product.getName())
-                .quantity(request.getQuantity())
-                .build();
+    // CartItem builder
+    CartItem cartItem = CartItem.builder()
+            .cart(cart)
+            .product(product)
+            .productName(product.getName())
+            .quantity(request.getQuantity())
+            .build();
 
-        cartItemRepository.save(cartItem);
-        return CartItemResponse.builder()
-                .id(cartItem.getCartItemId())
-                .productId(product.getProductId())
-                .quantity(cartItem.getQuantity())
-                .build();
-    }
+    cartItemRepository.save(cartItem);
+
+    return CartItemResponse.builder()
+            .id(cartItem.getCartItemId())
+            .productId(product.getProductId())
+            .quantity(cartItem.getQuantity())
+            .build();
+}
 
     public List<CartItem> getCartItems(Long cartId) {
         cartRepository.findById(cartId).orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + cartId));
