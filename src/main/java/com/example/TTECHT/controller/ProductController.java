@@ -186,6 +186,17 @@ public class ProductController {
         List<ProductDTO> bestSellers = productService.getBestSellerProductsByCategory(categoryId, limit);
         return ResponseEntity.ok(bestSellers);
     }
+    
+    /**
+     * 13. GET /api/products/new-arrivals - Get new arrival products
+     */
+    @GetMapping("/new-arrivals")
+    public ResponseEntity<List<ProductDTO>> getNewArrivalProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> newArrivals = productService.getNewArrivalProducts(limit);
+        return ResponseEntity.ok(newArrivals);
+    }
+
 
 //    @GetMapping("/top-selling")
 //    public ResponseEntity<List<ProductDTO>> getTopSellingProducts(
