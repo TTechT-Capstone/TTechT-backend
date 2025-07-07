@@ -32,7 +32,8 @@ public class SecurityConfig {
             "/api/v1/auth/logout",
             "/api/v1/auth/refresh",
             "api/v1/roles",
-            "/api/v1/sellers"
+            "/api/v1/sellers",
+            "/api/payments/webhook"
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
@@ -111,7 +112,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.setAllowedOrigins(List.of("http://localhost:3000"));
+        corsConfiguration.setAllowedOrigins(List.of("http://localhost:3000","https://origity.vercel.app"));
         corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         corsConfiguration.setAllowedHeaders(List.of("*"));
         corsConfiguration.setAllowCredentials(true);
