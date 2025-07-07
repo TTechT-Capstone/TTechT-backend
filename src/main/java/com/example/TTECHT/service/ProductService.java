@@ -41,6 +41,11 @@ public interface ProductService {
     List<ProductDTO> getBestSellerProductsByCategory(Long categoryId, int limit);
     
     List<ProductDTO> getTopSellingProducts(int minSoldQuantity, int limit);
+    
+    // New arrival methods
+    List<ProductDTO> getNewArrivalProducts(int limit);
+    
+    List<ProductDTO> getNewArrivalProductsByCategory(Long categoryId, int limit);
 
 //    List<ProductDTO> getProductsByCategory(Long categoryId);
 //

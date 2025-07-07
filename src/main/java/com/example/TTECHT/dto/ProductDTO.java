@@ -26,5 +26,6 @@ public class ProductDTO {
     private String brand;
     private String size;
     private Boolean isBestSeller;
+    private Boolean isNewArrival;
     private LocalDateTime createdAt;
 }

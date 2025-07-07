@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -283,6 +284,35 @@ public class ProductServiceImpl implements ProductService {
         ProductDTO dto = convertToDTO(product);
         dto.setSoldQuantity(product.getSoldQuantity());
         dto.setIsBestSeller(product.getSoldQuantity() > 0);
+        return dto;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getNewArrivalProducts(int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findNewArrivalProducts(pageable)
+                .stream()
+                .map(this::convertToNewArrivalDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getNewArrivalProductsByCategory(Long categoryId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findNewArrivalProductsByCategory(categoryId, pageable)
+                .stream()
+                .map(this::convertToNewArrivalDTO)
+                .collect(Collectors.toList());
+    }
+
+    
+    private ProductDTO convertToNewArrivalDTO(Product product) {
+        ProductDTO dto = convertToDTO(product);
+        // Mark as new arrival if created within last 30 days
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        dto.setIsNewArrival(product.getCreatedAt().isAfter(thirtyDaysAgo));
         return dto;
     }
 }

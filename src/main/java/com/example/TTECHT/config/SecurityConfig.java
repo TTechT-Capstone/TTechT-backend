@@ -32,7 +32,8 @@ public class SecurityConfig {
             "/api/v1/auth/logout",
             "/api/v1/auth/refresh",
             "api/v1/roles",
-            "/api/v1/sellers"
+            "/api/v1/sellers",
+            "/api/payments/webhook"
     };
 
     private final String[] PUBLIC_GET_ENDPOINTS = {
