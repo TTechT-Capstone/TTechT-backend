@@ -126,7 +126,20 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
             throw new IllegalArgumentException("Insufficient stock for product");
         }
 
-        int currentStock = product.getStockQuantity() - quantity;
+        if (quantity == cartItem.getQuantity()) {
+            log.info("No change in quantity for item ID: {}", itemId);
+            return cartItem; // No change in quantity, return the existing item
+        }
+
+        int currentStock ;
+        if (quantity > cartItem.getQuantity()) {
+            log.info("Increasing quantity for item ID: {} from {} to {}", itemId, cartItem.getQuantity(), quantity);
+            currentStock = product.getStockQuantity() - (quantity - cartItem.getQuantity());
+        } else {
+            log.info("Decreasing quantity for item ID: {} from {} to {}", itemId, cartItem.getQuantity(), quantity);
+            currentStock = product.getStockQuantity() + (cartItem.getQuantity() - quantity);
+        }
+
 
         cartItem.setQuantity(quantity);
         cartItemRepository.save(cartItem);
