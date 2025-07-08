@@ -27,4 +27,22 @@ public class OrderController {
                 .result(orderService.createOrder(userId, cartId, orderCreationRequest))
                 .build();
     }
+
+    @GetMapping("/{orderId}")
+    ApiResponse<OrderResponse> getOrder(@PathVariable Long orderId) {
+        // Logic to retrieve an order by its ID
+        log.info("Get order with ID: {}", orderId);
+        return ApiResponse.<OrderResponse>builder()
+                .result(orderService.getOrder(orderId))
+                .build();
+    }
+
+    @GetMapping("/user/{userId}")
+    ApiResponse<OrderResponse> getOrderByUserId(@PathVariable Long userId) {
+        // Logic to retrieve an order by user ID
+        log.info("Get order for user ID: {}", userId);
+        return ApiResponse.<OrderResponse>builder()
+                .result(orderService.getOrderByUserId(userId))
+                .build();
+    }
 }
