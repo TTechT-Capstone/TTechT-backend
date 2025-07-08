@@ -74,9 +74,25 @@ public class OrderServiceImpl implements OrderService {
     }
 
     public OrderResponse getOrder(Long orderId) {
-        // Implementation for retrieving an order
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found with ID: " + orderId));
+
+        OrderResponse orderResponse = OrderResponse.builder().id(orderId).orderNumber(order.getOrderNumber())
+                .orderStatus(order.getOrderStatus())
+                .totalAmount(order.getTotalAmount())
+                .contactName(order.getContactName())
+                .contactEmail(order.getContactEmail())
+                .contactPhone(order.getContactPhone())
+                .deliveryAddress(order.getDeliveryAddress())
+                .promotionCode(order.getPromotionCode())
+                .paymentMethod(order.getPaymentMethod())
+                .createdBy(order.getCreatedBy())
+                .updatedBy(order.getUpdatedBy())
+                .build();
+
         log.info("Retrieving order with ID: {}", orderId);
-        return null;
+        return orderResponse;
     }
 
 
@@ -84,5 +100,33 @@ public class OrderServiceImpl implements OrderService {
         // Implementation for updating an order
         log.info("Updating order with ID: {}", orderId);
         return null;
+    }
+
+    public OrderResponse getOrderByUserId(Long userId) {
+        // Implementation for retrieving an order by user ID
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+
+        Order order = orderRepository.findByUser(user)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found for user ID: " + userId));
+
+        OrderResponse orderResponse = OrderResponse.builder()
+                .id(order.getOrderId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getOrderStatus())
+                .totalAmount(order.getTotalAmount())
+                .contactName(order.getContactName())
+                .contactEmail(order.getContactEmail())
+                .contactPhone(order.getContactPhone())
+                .deliveryAddress(order.getDeliveryAddress())
+                .promotionCode(order.getPromotionCode())
+                .paymentMethod(order.getPaymentMethod())
+                .createdBy(order.getCreatedBy())
+                .updatedBy(order.getUpdatedBy())
+                .build();
+
+        log.info("Retrieving order for user ID: {}", userId);
+        return orderResponse;
     }
 }
