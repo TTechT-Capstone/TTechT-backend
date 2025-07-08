@@ -37,11 +37,25 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
     Product product = productRepository.findById(request.getProductId()) // Fixed: use actual product ID
             .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
 
+    //??? check lại
     // Check if the product is already in the cart
 //    if (cartItemRepository.existsByCartIdAndProduct(request.getCartId(), product)) { // Fixed: use existsBy
 //        log.error("Product with ID {} is already in the cart with ID {}", request.getProductId(), request.getCartId());
 //        throw new IllegalArgumentException("Product is already in the cart");
 //    }
+
+    if (request.getQuantity() <= 0) {
+        log.error("Invalid quantity: {}", request.getQuantity());
+        throw new IllegalArgumentException("Quantity must be greater than zero");
+    }
+
+    if (request.getQuantity() > product.getStockQuantity()){
+        log.error("Insufficient stock for product with ID {}. Requested: {}, Available: {}",
+                  request.getProductId(), request.getQuantity(), product.getStockQuantity());
+        throw new IllegalArgumentException("Insufficient stock for product");
+    }
+
+    int currentStock = product.getStockQuantity() - request.getQuantity();
 
     // CartItem builder
     CartItem cartItem = CartItem.builder()
@@ -52,6 +66,12 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
             .build();
 
     cartItemRepository.save(cartItem);
+
+    // Update product stock
+    product.setStockQuantity(currentStock);
+    productRepository.save(product);
+
+    log.info("Added product with ID {} to cart with ID {}", request.getProductId(), request.getCardId());
 
     return CartItemResponse.builder()
             .id(cartItem.getCartItemId())
@@ -69,11 +89,20 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
         Cart cart = cartRepository.findById(cartId).orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + cartId));
         CartItem cartItem = cartItemRepository.findById(itemId).orElseThrow(() -> new IllegalArgumentException("Cart item not found with id: " + itemId));
 
+        System.out.println("cartItem.getQuantity() = " + cartItem.getQuantity());
+
+        Product product = cartItem.getProduct();
+        // Restore product stock
+        product.setStockQuantity(product.getStockQuantity() + cartItem.getQuantity());
+
         if (!cartItem.getCart().equals(cart)) {
             throw new IllegalArgumentException("Cart item does not belong to the specified cart");
         }
 
         cartItemRepository.delete(cartItem);
+
+        // Update product stock in the repository
+        productRepository.save(product);
         return cartItem;
     }
 
@@ -86,9 +115,26 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
         if (!cartItem.getCart().equals(cart)) {
             throw new IllegalArgumentException("Cart item does not belong to the specified cart");
         }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero");
+        }
+
+        Product product = cartItem.getProduct();
+        if (quantity > product.getStockQuantity()){
+            log.error("Insufficient stock for product with ID {}. Requested: {}, Available: {}",
+                      product.getProductId(), quantity, product.getStockQuantity());
+            throw new IllegalArgumentException("Insufficient stock for product");
+        }
+
+        int currentStock = product.getStockQuantity() - quantity;
 
         cartItem.setQuantity(quantity);
-        return cartItemRepository.save(cartItem);
+        cartItemRepository.save(cartItem);
+
+        // Update product stock
+        product.setStockQuantity(currentStock);
+        productRepository.save(product);
+        return cartItem;
     }
 
     public CartItem getCartItemById(Long cartId, Long itemId) {

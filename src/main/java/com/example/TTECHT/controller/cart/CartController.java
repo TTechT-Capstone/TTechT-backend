@@ -38,4 +38,23 @@ public class CartController {
                 .build();
     }
 
+    @DeleteMapping("/{userId}/{cartId}")
+    ApiResponse<String> deleteCart(@PathVariable String userId, @PathVariable String cartId) {
+        // Logic to delete the cart for a specific user
+        log.info("Delete cart for user: {}", userId);
+        cartService.deleteCart(userId, cartId);
+        return ApiResponse.<String>builder()
+                .result("Cart deleted successfully")
+                .build();
+    }
+
+    @PostMapping("/submit/{userId}/{cartId}")
+    ApiResponse<String> submitCart(@PathVariable String userId, @PathVariable String cartId) {
+        // Assuming there's a method in CartService to handle cart submission
+        cartService.submitCart(userId, cartId);
+        return ApiResponse.<String>builder()
+                .result("Cart submitted successfully")
+                .build();
+    }
+
 }

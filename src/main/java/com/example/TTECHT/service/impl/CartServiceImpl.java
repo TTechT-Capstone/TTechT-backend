@@ -2,6 +2,7 @@ package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.dto.repsonse.CartItemResponse;
 import com.example.TTECHT.dto.repsonse.CartResponse;
+import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.CartCreationRequest;
 import com.example.TTECHT.entity.cart.Cart;
 import com.example.TTECHT.entity.cart.CartItem;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -143,6 +145,29 @@ public class CartServiceImpl implements CartService {
 
         // apply the promotion code
         cart.setPromotionCode(promotionCode);
+        cartRepository.save(cart);
+    }
+
+    @PreAuthorize("hasRole('USER')")
+    public void submitCart(String userId, String cartId) {
+        // check if the userId is valid
+        if (userId == null || userId.isEmpty()) {
+            log.error("Invalid userId: {}", userId);
+            throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+
+        // retrieve the cart for the user
+        Cart cart = cartRepository.findByUserId(Long.valueOf(userId))
+                .orElseThrow(() -> new IllegalArgumentException("Cart not found for user"));
+
+        // check if the cart is already submitted
+        if (cart.getSubmittedTime() != null) {
+            log.error("Cart with ID {} has already been submitted", cart.getId());
+            throw new IllegalArgumentException("Cart has already been submitted");
+        }
+
+        // submit the cart
+        cart.setSubmittedTime(LocalDateTime.now());
         cartRepository.save(cart);
     }
 }

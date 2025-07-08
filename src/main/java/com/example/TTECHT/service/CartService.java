@@ -10,4 +10,5 @@ public interface CartService {
     // clear all items in the cart
     void clearCart(String userId, String cartId);
     void applyPromotionCode(String userId, String promotionCode);
+    void submitCart(String userId, String cartId);
 }
