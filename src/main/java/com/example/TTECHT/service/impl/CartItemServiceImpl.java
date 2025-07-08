@@ -31,8 +31,8 @@ public class CartItemServiceImpl implements CartItemService {
 
 
 public CartItemResponse addItemToCart(CartItemRequest request) {
-    Cart cart = cartRepository.findById(Long.valueOf(request.getCardId())) // Fixed: removed Long.valueOf if getCartId returns Long
-            .orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + request.getCardId()));
+    Cart cart = cartRepository.findById(Long.valueOf(request.getCartId())) // Fixed: removed Long.valueOf if getCartId returns Long
+            .orElseThrow(() -> new IllegalArgumentException("Cart not found with id: " + request.getCartId()));
 
     Product product = productRepository.findById(request.getProductId()) // Fixed: use actual product ID
             .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
@@ -71,7 +71,7 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
     product.setStockQuantity(currentStock);
     productRepository.save(product);
 
-    log.info("Added product with ID {} to cart with ID {}", request.getProductId(), request.getCardId());
+    log.info("Added product with ID {} to cart with ID {}", request.getProductId(), request.getCartId());
 
     return CartItemResponse.builder()
             .id(cartItem.getCartItemId())
