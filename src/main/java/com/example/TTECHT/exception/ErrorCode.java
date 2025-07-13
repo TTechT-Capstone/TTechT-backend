@@ -28,6 +28,13 @@ public enum ErrorCode {
     PASSWORD_CANNOT_BE_BLANK(1015, "Password cannot be blank", HttpStatus.BAD_REQUEST),
     PASSWORDS_NOT_MATCH(1016, "Passwords do not match", HttpStatus.BAD_REQUEST),
     CART_NOT_FOUND(2001, "Cart not found", HttpStatus.NOT_FOUND),
+    CART_ITEM_NOT_FOUND(2002, "Cart item not found", HttpStatus.NOT_FOUND),
+    CART_ID_MISMATCH(2003, "Cart ID mismatch for user", HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_STOCK(2004, "Insufficient stock for product", HttpStatus.BAD_REQUEST),
+    INVALID_CART_ITEM_ID(2005, "Invalid cart item ID", HttpStatus.BAD_REQUEST),
+    ORDER_CREATION_FAILED(3001, "Order creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_ORDER_DATA(3002, "Invalid order data", HttpStatus.BAD_REQUEST),
+    ORDER_NOT_FOUND(3003, "Order not found", HttpStatus.NOT_FOUND),
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {

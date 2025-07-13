@@ -1,6 +1,6 @@
 package com.example.TTECHT.entity.order;
 
-import com.example.TTECHT.entity.cart.CartItem;
+
 import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import jakarta.persistence.Entity;

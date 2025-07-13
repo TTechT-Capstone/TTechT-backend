@@ -73,6 +73,7 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
             .productId(product.getProductId())
             .productName(product.getName())
             .quantity(cartItem.getQuantity())
+            .price(product.getPrice().doubleValue())
             .build();
 }
 
