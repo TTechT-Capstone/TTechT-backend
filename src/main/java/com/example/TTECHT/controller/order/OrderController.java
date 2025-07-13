@@ -8,8 +8,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -38,10 +39,10 @@ public class OrderController {
     }
 
     @GetMapping("/user/{userId}")
-    ApiResponse<OrderResponse> getOrderByUserId(@PathVariable Long userId) {
+    ApiResponse<List<OrderResponse>> getOrderByUserId(@PathVariable Long userId) {
         // Logic to retrieve an order by user ID
         log.info("Get order for user ID: {}", userId);
-        return ApiResponse.<OrderResponse>builder()
+        return ApiResponse.<List<OrderResponse>>builder()
                 .result(orderService.getOrderByUserId(userId))
                 .build();
     }

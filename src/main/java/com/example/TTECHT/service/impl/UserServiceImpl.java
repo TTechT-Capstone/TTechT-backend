@@ -37,6 +37,24 @@ public class UserServiceImpl implements UserService {
     PasswordEncoder passwordEncoder;
 
     public UserResponse createUser(UserCreationRequest request) {
+
+        userRepository.findByUsername(request.getUsername()).ifPresent(user -> {
+            log.error("User with username {} already exists", request.getUsername());
+            throw new AppException(ErrorCode.USERNAME_EXISTED);
+        });
+
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            log.error("User with email {} already exists", request.getEmail());
+            throw new AppException(ErrorCode.EMAIL_EXISTED);
+        });
+
+
+        userRepository.findByPhoneNumber(request.getPhoneNumber()).ifPresent(user -> {
+            log.error("User with phone number {} already exists", request.getPhoneNumber());
+            throw new AppException(ErrorCode.PHONE_NUMBER_EXISTED);
+        });
+
+
         User user = userMapper.toUser(request);
         log.info("User with username {} has been created", user.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -64,19 +82,6 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
-    //    @PostAuthorize("returnObject.username == authentication.name")
-//    public UserResponse updateUser(String userId, UserUpdateRequest request) {
-//        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-//
-//        System.out.println(request.toString());
-//        userMapper.updateUser(user, request);
-//        user.setPassword(passwordEncoder.encode(request.getPassword()));
-//
-//        var roles = roleRepository.findByNameIn(request.getRoles());
-//        user.setRoles(new HashSet<>(roles));
-//
-//        return userMapper.toUserResponse(userRepository.save(user));
-//    }
     public UserResponse updateUser(String userId, UserUpdateRequest request) {
         try {
             log.info("Updating user with ID: {}", userId);
@@ -121,7 +126,12 @@ public class UserServiceImpl implements UserService {
     }
 
     public void updatePassword(String userId, UpdatePasswordRequest request) {
+        
         User user = userRepository.findById(userId).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.INVALID_PASSWORD);
+        }
+
         if (request.getNewPassword() == null || request.getNewPassword().isBlank() || request.getConfirmNewPassword() == null || request.getConfirmNewPassword().isBlank()) {
             throw new AppException(ErrorCode.PASSWORD_CANNOT_BE_BLANK);
         }

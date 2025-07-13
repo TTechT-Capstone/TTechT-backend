@@ -1,7 +1,5 @@
 package com.example.TTECHT.dto.repsonse;
 
-
-import com.example.TTECHT.entity.cart.CartItem;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

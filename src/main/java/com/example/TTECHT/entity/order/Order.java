@@ -1,8 +1,6 @@
 package com.example.TTECHT.entity.order;
 
-
-
-import com.example.TTECHT.entity.cart.Cart;
+import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import jakarta.persistence.Entity;
@@ -10,6 +8,7 @@ import jakarta.persistence.Table;
 import lombok.*;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -64,12 +63,10 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cart_id", referencedColumnName = "id")
-    private Cart cart;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OrderItem> orderItems;
 }

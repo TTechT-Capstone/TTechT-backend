@@ -54,10 +54,8 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
                   request.getProductId(), request.getQuantity(), product.getStockQuantity());
         throw new IllegalArgumentException("Insufficient stock for product");
     }
-
-    int currentStock = product.getStockQuantity() - request.getQuantity();
-
-    // CartItem builder
+    
+    //CartItem builder
     CartItem cartItem = CartItem.builder()
             .cart(cart)
             .product(product)
@@ -67,15 +65,13 @@ public CartItemResponse addItemToCart(CartItemRequest request) {
 
     cartItemRepository.save(cartItem);
 
-    // Update product stock
-    product.setStockQuantity(currentStock);
-    productRepository.save(product);
 
     log.info("Added product with ID {} to cart with ID {}", request.getProductId(), request.getCartId());
 
     return CartItemResponse.builder()
             .id(cartItem.getCartItemId())
             .productId(product.getProductId())
+            .productName(product.getName())
             .quantity(cartItem.getQuantity())
             .build();
 }

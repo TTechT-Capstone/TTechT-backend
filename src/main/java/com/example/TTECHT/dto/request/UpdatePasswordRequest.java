@@ -14,6 +14,10 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UpdatePasswordRequest {
 
+
+    @NotBlank(message = "Old password cannot be blank")
+    String oldPassword;
+
     @NotBlank(message = "New password cannot be blank")
     @Size(min = 6, message = "New password must be at least 6 characters long")
     // FIXME: For test purposes, we are not using the regex pattern for password validation
