@@ -9,6 +9,9 @@ public enum ErrorCode {
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Uncategorized error", HttpStatus.BAD_REQUEST),
     USER_EXISTED(1002, "User existed", HttpStatus.BAD_REQUEST),
+    EMAIL_EXISTED(1002, "Email existed", HttpStatus.BAD_REQUEST),
+    USERNAME_EXISTED(1002, "Username existed", HttpStatus.BAD_REQUEST),
+    PHONE_NUMBER_EXISTED(1002, "Phone existed", HttpStatus.BAD_REQUEST),
     USERNAME_INVALID(1003, "Username must be at least {min} characters", HttpStatus.BAD_REQUEST),
     INVALID_PASSWORD(1004, "Password must be at least {min} characters", HttpStatus.BAD_REQUEST),
     USER_NOT_EXISTED(1005, "User not existed", HttpStatus.NOT_FOUND),
@@ -22,6 +25,16 @@ public enum ErrorCode {
     STORE_NAME_ALREADY_EXISTS(1013, "Store name already exists", HttpStatus.BAD_REQUEST),
     SELLER_CREATION_FAILED(1014, "Failed to create seller", HttpStatus.INTERNAL_SERVER_ERROR),
     SELLER_UPDATE_FAILED(1013, "Failed to update seller", HttpStatus.INTERNAL_SERVER_ERROR),
+    PASSWORD_CANNOT_BE_BLANK(1015, "Password cannot be blank", HttpStatus.BAD_REQUEST),
+    PASSWORDS_NOT_MATCH(1016, "Passwords do not match", HttpStatus.BAD_REQUEST),
+    CART_NOT_FOUND(2001, "Cart not found", HttpStatus.NOT_FOUND),
+    CART_ITEM_NOT_FOUND(2002, "Cart item not found", HttpStatus.NOT_FOUND),
+    CART_ID_MISMATCH(2003, "Cart ID mismatch for user", HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_STOCK(2004, "Insufficient stock for product", HttpStatus.BAD_REQUEST),
+    INVALID_CART_ITEM_ID(2005, "Invalid cart item ID", HttpStatus.BAD_REQUEST),
+    ORDER_CREATION_FAILED(3001, "Order creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_ORDER_DATA(3002, "Invalid order data", HttpStatus.BAD_REQUEST),
+    ORDER_NOT_FOUND(3003, "Order not found", HttpStatus.NOT_FOUND),
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {

@@ -11,11 +11,13 @@ import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +49,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductDTO createProduct(ProductCreateDTO productCreateDTO, String sellerUsername) {
         Category category = categoryService.findEntityById(productCreateDTO.getCategoryId());
-        User seller = userRepository.findById(productCreateDTO.getUserId())
+        User seller = userRepository.findByUsername(sellerUsername)
                 .orElseThrow(() -> new RuntimeException("Seller not found: " + sellerUsername));
 
         Product product = new Product();
@@ -57,6 +59,12 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
         product.setSeller(seller);
 
         Product savedProduct = productRepository.save(product);
@@ -74,6 +82,9 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
+        product.setColor(productCreateDTO.getColor());
+        product.setBrand(productCreateDTO.getBrand());
+        product.setSize(productCreateDTO.getSize());
 
         Product updatedProduct = productRepository.save(product);
         return convertToDTO(updatedProduct);
@@ -197,6 +208,10 @@ public class ProductServiceImpl implements ProductService {
             dto.setSellerUsername(product.getSeller().getUsername());
             dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
         }
+        dto.setSoldQuantity(product.getSoldQuantity());
+        dto.setColor(product.getColor());
+        dto.setBrand(product.getBrand());
+        dto.setSize(product.getSize());
         dto.setCreatedAt(product.getCreatedAt());
         return dto;
     }
@@ -211,6 +226,9 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", product.getDescription());
         map.put("price", product.getPrice());
         map.put("stockQuantity", product.getStockQuantity());
+        map.put("color", product.getColor());
+        map.put("brand", product.getBrand());
+        map.put("size", product.getSize());
         map.put("createdAt", product.getCreatedAt());
         return map;
     }
@@ -225,7 +243,76 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", dto.getDescription());
         map.put("price", dto.getPrice());
         map.put("stockQuantity", dto.getStockQuantity());
+        map.put("color", dto.getColor());
+        map.put("brand", dto.getBrand());
+        map.put("size", dto.getSize());
         map.put("createdAt", dto.getCreatedAt());
         return map;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getBestSellerProducts(int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findBestSellerProducts(pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getBestSellerProductsByCategory(Long categoryId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findBestSellerProductsByCategory(categoryId, pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getTopSellingProducts(int minSoldQuantity, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findProductsWithMinimumSales(minSoldQuantity, pageable)
+                .stream()
+                .map(this::convertToBestSellerDTO)
+                .collect(Collectors.toList());
+    }
+    
+    private ProductDTO convertToBestSellerDTO(Product product) {
+        ProductDTO dto = convertToDTO(product);
+        dto.setSoldQuantity(product.getSoldQuantity());
+        dto.setIsBestSeller(product.getSoldQuantity() > 0);
+        return dto;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getNewArrivalProducts(int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findNewArrivalProducts(pageable)
+                .stream()
+                .map(this::convertToNewArrivalDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getNewArrivalProductsByCategory(Long categoryId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepository.findNewArrivalProductsByCategory(categoryId, pageable)
+                .stream()
+                .map(this::convertToNewArrivalDTO)
+                .collect(Collectors.toList());
+    }
+
+    
+    private ProductDTO convertToNewArrivalDTO(Product product) {
+        ProductDTO dto = convertToDTO(product);
+        // Mark as new arrival if created within last 30 days
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        dto.setIsNewArrival(product.getCreatedAt().isAfter(thirtyDaysAgo));
+        return dto;
     }
 }

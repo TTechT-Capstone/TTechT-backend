@@ -8,7 +8,6 @@ import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 public interface ProductService {
 
@@ -35,6 +34,18 @@ public interface ProductService {
     ProductDTO updateStock(Long id, Integer newStock);
 
     List<ProductDTO> getProductsByCategory(Long categoryId);
+
+    List<ProductDTO> getBestSellerProducts(int limit);
+    
+    List<ProductDTO> getBestSellerProductsByCategory(Long categoryId, int limit);
+    
+    List<ProductDTO> getTopSellingProducts(int minSoldQuantity, int limit);
+    
+    // New arrival methods
+    List<ProductDTO> getNewArrivalProducts(int limit);
+    
+    List<ProductDTO> getNewArrivalProductsByCategory(Long categoryId, int limit);
+
 //    List<ProductDTO> getProductsByCategory(Long categoryId);
 //
 //    List<String> getAllCategories();

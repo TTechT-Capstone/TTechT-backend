@@ -22,12 +22,10 @@ import org.springframework.beans.factory.annotation.Value;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.parameters.P;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.example.TTECHT.repository.user.UserRepository;
-import org.springframework.security.authentication.AuthenticationManager;
 import com.example.TTECHT.service.AuthService;
 
 

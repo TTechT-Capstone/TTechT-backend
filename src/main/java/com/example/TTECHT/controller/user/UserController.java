@@ -2,6 +2,7 @@ package com.example.TTECHT.controller.user;
 
 import com.example.TTECHT.dto.repsonse.UserResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
+import com.example.TTECHT.dto.request.UpdatePasswordRequest;
 import com.example.TTECHT.dto.request.UserCreationRequest;
 import com.example.TTECHT.dto.request.UserUpdateRequest;
 import com.example.TTECHT.service.UserService;
@@ -25,7 +26,7 @@ public class UserController {
     @PostMapping
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
         log.info("Creating user with username: {}", request);
-        System.out.println(request.toString());
+
         return ApiResponse.<UserResponse>builder()
                 .result(userService.createUser(request))
                 .build();
@@ -65,6 +66,12 @@ public class UserController {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUser(userId, request))
                 .build();
+    }
+
+    @PutMapping("/update-password/{userId}")
+    ApiResponse<String> updatePassword(@PathVariable String userId, @RequestBody @Valid UpdatePasswordRequest request) {
+        userService.updatePassword(userId, request);
+        return ApiResponse.<String>builder().result("Password has been updated").build();
     }
 
     @PutMapping("/inactivate/{userId}")

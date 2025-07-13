@@ -1,0 +1,382 @@
+package com.example.TTECHT.service.impl;
+
+import com.example.TTECHT.dto.payment.CreatePaymentRequest;
+import com.example.TTECHT.dto.payment.PaymentDTO;
+import com.example.TTECHT.dto.payment.PaymentItemDTO;
+import com.example.TTECHT.dto.payment.PaymentResponse;
+import com.example.TTECHT.entity.Payment;
+import com.example.TTECHT.entity.PaymentItem;
+import com.example.TTECHT.entity.Product;
+import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.PaymentStatus;
+import com.example.TTECHT.repository.PaymentRepository;
+import com.example.TTECHT.repository.ProductRepository;
+import com.example.TTECHT.repository.user.UserRepository;
+import com.example.TTECHT.service.PaymentService;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Event;
+import com.stripe.model.PaymentIntent;
+import com.stripe.model.checkout.Session;
+import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.checkout.SessionCreateParams;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class PaymentServiceImpl implements PaymentService {
+    
+    private final PaymentRepository paymentRepository;
+    private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+    
+    @Value("${stripe.success.url}")
+    private String successUrl;
+    
+    @Value("${stripe.cancel.url}")
+    private String cancelUrl;
+    
+    @Override
+    public PaymentResponse createCheckoutSession(CreatePaymentRequest request, String username) throws StripeException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        // Calculate total amount and prepare line items
+        List<SessionCreateParams.LineItem> lineItems = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<PaymentItem> paymentItems = new ArrayList<>();
+        
+        for (CreatePaymentRequest.PaymentItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
+            
+            // Check stock availability
+            if (product.getStockQuantity() < itemRequest.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for product: " + product.getName());
+            }
+            
+            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            totalAmount = totalAmount.add(itemTotal);
+            
+            // Create Stripe line item
+            SessionCreateParams.LineItem lineItem = SessionCreateParams.LineItem.builder()
+                    .setPriceData(
+                            SessionCreateParams.LineItem.PriceData.builder()
+                                    .setCurrency("usd")
+                                    .setUnitAmount(product.getPrice().multiply(BigDecimal.valueOf(100)).longValue()) // Convert to cents
+                                    .setProductData(
+                                            SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                    .setName(product.getName())
+                                                    .setDescription(product.getDescription())
+                                                    .build()
+                                    )
+                                    .build()
+                    )
+                    .setQuantity(itemRequest.getQuantity().longValue())
+                    .build();
+            
+            lineItems.add(lineItem);
+            
+            // Prepare payment item
+            PaymentItem paymentItem = PaymentItem.builder()
+                    .product(product)
+                    .quantity(itemRequest.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .totalPrice(itemTotal)
+                    .productName(product.getName())
+                    .productDescription(product.getDescription())
+                    .build();
+            
+            paymentItems.add(paymentItem);
+        }
+        
+        // Create payment record WITHOUT items first
+        Payment payment = Payment.builder()
+                .user(user)
+                .amount(totalAmount)
+                .currency("USD")
+                .status(PaymentStatus.PENDING)
+                .customerEmail(request.getCustomerEmail() != null ? request.getCustomerEmail() : user.getEmail())
+                .customerName(request.getCustomerName() != null ? request.getCustomerName() : 
+                             user.getFirstName() + " " + user.getLastName())
+                .description(request.getDescription())
+                .build();
+        
+        // Save payment first to get the ID
+        Payment savedPayment = paymentRepository.save(payment);
+        
+        // Now set payment reference in items and set the items
+        paymentItems.forEach(item -> item.setPayment(savedPayment));
+        savedPayment.setItems(paymentItems);
+        
+        // Create Stripe Checkout Session
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("payment_id", savedPayment.getPaymentId().toString());
+        metadata.put("user_id", user.getId().toString());
+        
+        SessionCreateParams params = SessionCreateParams.builder()
+                .setMode(SessionCreateParams.Mode.PAYMENT)
+                .setSuccessUrl(request.getSuccessUrl() != null ? request.getSuccessUrl() : successUrl)
+                .setCancelUrl(request.getCancelUrl() != null ? request.getCancelUrl() : cancelUrl)
+                .addAllLineItem(lineItems)
+                .setCustomerEmail(savedPayment.getCustomerEmail())
+                .putAllMetadata(metadata)
+                .build();
+        
+        Session session = Session.create(params);
+        
+        // Update payment with session ID
+        savedPayment.setStripeSessionId(session.getId());
+        savedPayment.setStripePaymentIntentId(session.getPaymentIntent());
+        paymentRepository.save(savedPayment);
+        
+        return PaymentResponse.builder()
+                .sessionId(session.getId())
+                .paymentIntentId(session.getPaymentIntent())
+                .checkoutUrl(session.getUrl())
+                .status(session.getStatus())
+                .paymentId(savedPayment.getPaymentId())
+                .build();
+    }
+    
+    @Override
+    public PaymentResponse createPaymentIntent(CreatePaymentRequest request, String username) throws StripeException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        // Calculate total amount
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<PaymentItem> paymentItems = new ArrayList<>();
+        
+        for (CreatePaymentRequest.PaymentItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
+            
+            if (product.getStockQuantity() < itemRequest.getQuantity()) {
+                throw new RuntimeException("Insufficient stock for product: " + product.getName());
+            }
+            
+            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            totalAmount = totalAmount.add(itemTotal);
+            
+            PaymentItem paymentItem = PaymentItem.builder()
+                    .product(product)
+                    .quantity(itemRequest.getQuantity())
+                    .unitPrice(product.getPrice())
+                    .totalPrice(itemTotal)
+                    .productName(product.getName())
+                    .productDescription(product.getDescription())
+                    .build();
+            
+            paymentItems.add(paymentItem);
+        }
+        
+        // Create payment record WITHOUT items first
+        Payment payment = Payment.builder()
+                .user(user)
+                .amount(totalAmount)
+                .currency("USD")
+                .status(PaymentStatus.PENDING)
+                .customerEmail(request.getCustomerEmail() != null ? request.getCustomerEmail() : user.getEmail())
+                .customerName(request.getCustomerName() != null ? request.getCustomerName() : 
+                             user.getFirstName() + " " + user.getLastName())
+                .description(request.getDescription())
+                .build();
+        
+        // Save payment first to get the ID
+        Payment savedPayment = paymentRepository.save(payment);
+        
+        // Now set payment reference in items and set the items
+        paymentItems.forEach(item -> item.setPayment(savedPayment));
+        savedPayment.setItems(paymentItems);
+        
+        // Create Stripe PaymentIntent
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("payment_id", savedPayment.getPaymentId().toString());
+        metadata.put("user_id", user.getId().toString());
+        
+        PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                .setAmount(totalAmount.multiply(BigDecimal.valueOf(100)).longValue()) // Convert to cents
+                .setCurrency("usd")
+                .setAutomaticPaymentMethods(
+                        PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
+                                .setEnabled(true)
+                                .build()
+                )
+                .putAllMetadata(metadata)
+                .build();
+        
+        PaymentIntent paymentIntent = PaymentIntent.create(params);
+        
+        // Update payment with PaymentIntent ID
+        savedPayment.setStripePaymentIntentId(paymentIntent.getId());
+        paymentRepository.save(savedPayment);
+        
+        return PaymentResponse.builder()
+                .paymentIntentId(paymentIntent.getId())
+                .clientSecret(paymentIntent.getClientSecret())
+                .status(paymentIntent.getStatus())
+                .paymentId(savedPayment.getPaymentId())
+                .build();
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentDTO getPaymentById(Long paymentId) {
+        Payment payment = findEntityById(paymentId);
+        return convertToDTO(payment);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentDTO getPaymentByStripePaymentIntentId(String paymentIntentId) {
+        Payment payment = findEntityByStripePaymentIntentId(paymentIntentId);
+        return convertToDTO(payment);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentDTO getPaymentByStripeSessionId(String sessionId) {
+        Payment payment = paymentRepository.findByStripeSessionId(sessionId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with session ID: " + sessionId));
+        return convertToDTO(payment);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentDTO> getPaymentsByUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        return paymentRepository.findByUserOrderByCreatedAtDesc(user)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PaymentDTO> getPaymentsByUser(String username, Pageable pageable) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        return paymentRepository.findByUserOrderByCreatedAtDesc(user, pageable)
+                .map(this::convertToDTO);
+    }
+    
+    @Override
+    public PaymentDTO updatePaymentStatus(String paymentIntentId, PaymentStatus status) {
+        return updatePaymentStatus(paymentIntentId, status, null);
+    }
+    
+    @Override
+    public PaymentDTO updatePaymentStatus(String paymentIntentId, PaymentStatus status, String failureReason) {
+        Payment payment = findEntityByStripePaymentIntentId(paymentIntentId);
+        
+        PaymentStatus oldStatus = payment.getStatus();
+        payment.setStatus(status);
+        payment.setFailureReason(failureReason);
+        
+        if (status == PaymentStatus.SUCCEEDED && oldStatus != PaymentStatus.SUCCEEDED) {
+            payment.setPaidAt(LocalDateTime.now());
+            
+            // Update product stock and sold quantity
+            updateProductInventory(payment);
+        }
+        
+        Payment updatedPayment = paymentRepository.save(payment);
+        return convertToDTO(updatedPayment);
+    }
+    
+    private void updateProductInventory(Payment payment) {
+        for (PaymentItem item : payment.getItems()) {
+            Product product = item.getProduct();
+            product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+            product.setSoldQuantity(product.getSoldQuantity() + item.getQuantity());
+            productRepository.save(product);
+        }
+    }
+    
+    @Override
+    public void handleStripeWebhook(String payload, String sigHeader) {
+        // Webhook handling implementation
+        // This would process Stripe webhook events
+        log.info("Received Stripe webhook: {}", payload);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentDTO> getPaymentsByStatus(PaymentStatus status) {
+        return paymentRepository.findByStatus(status)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Payment findEntityById(Long paymentId) {
+        return paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with ID: " + paymentId));
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Payment findEntityByStripePaymentIntentId(String paymentIntentId) {
+        return paymentRepository.findByStripePaymentIntentId(paymentIntentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with PaymentIntent ID: " + paymentIntentId));
+    }
+    
+    private PaymentDTO convertToDTO(Payment payment) {
+        List<PaymentItemDTO> itemDTOs = payment.getItems().stream()
+                .map(this::convertItemToDTO)
+                .collect(Collectors.toList());
+        
+        return PaymentDTO.builder()
+                .paymentId(payment.getPaymentId())
+                .stripePaymentIntentId(payment.getStripePaymentIntentId())
+                .stripeSessionId(payment.getStripeSessionId())
+                .userId(payment.getUser().getId())
+                .username(payment.getUser().getUsername())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .status(payment.getStatus())
+                .paymentMethod(payment.getPaymentMethod())
+                .customerEmail(payment.getCustomerEmail())
+                .customerName(payment.getCustomerName())
+                .description(payment.getDescription())
+                .failureReason(payment.getFailureReason())
+                .items(itemDTOs)
+                .createdAt(payment.getCreatedAt())
+                .updatedAt(payment.getUpdatedAt())
+                .paidAt(payment.getPaidAt())
+                .build();
+    }
+    
+    private PaymentItemDTO convertItemToDTO(PaymentItem item) {
+        return PaymentItemDTO.builder()
+                .paymentItemId(item.getPaymentItemId())
+                .productId(item.getProduct().getProductId())
+                .productName(item.getProductName())
+                .productDescription(item.getProductDescription())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
+                .build();
+    }
+}

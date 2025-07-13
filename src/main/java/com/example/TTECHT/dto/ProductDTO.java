@@ -21,5 +21,11 @@ public class ProductDTO {
     private Integer stockQuantity;
     private String sellerUsername;
     private String sellerName;
+    private Integer soldQuantity;
+    private String color;
+    private String brand;
+    private String size;
+    private Boolean isBestSeller;
+    private Boolean isNewArrival;
     private LocalDateTime createdAt;
 }

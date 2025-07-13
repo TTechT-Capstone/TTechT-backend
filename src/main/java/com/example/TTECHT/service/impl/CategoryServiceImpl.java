@@ -46,6 +46,7 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = new Category();
         category.setName(categoryCreateDTO.getName());
         category.setDescription(categoryCreateDTO.getDescription());
+        category.setImagePath(categoryCreateDTO.getImagePath());
         
         Category savedCategory = categoryRepository.save(category);
         return convertToDTO(savedCategory);
@@ -63,6 +64,7 @@ public class CategoryServiceImpl implements CategoryService {
         
         category.setName(categoryCreateDTO.getName());
         category.setDescription(categoryCreateDTO.getDescription());
+        category.setImagePath(categoryCreateDTO.getImagePath());
         
         Category updatedCategory = categoryRepository.save(category);
         return convertToDTO(updatedCategory);
@@ -122,6 +124,7 @@ public class CategoryServiceImpl implements CategoryService {
         dto.setCategoryId(category.getCategoryId());
         dto.setName(category.getName());
         dto.setDescription(category.getDescription());
+        dto.setImagePath(category.getImagePath());
         return dto;
     }
 }

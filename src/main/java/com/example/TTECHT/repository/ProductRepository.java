@@ -38,4 +38,24 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByCategoryId(@Param("categoryId") Long categoryId);
     
     List<Product> findBySeller(User seller);
+    
+    // Best seller queries based on sold quantity
+    @Query("SELECT p FROM Product p ORDER BY p.soldQuantity DESC")
+    List<Product> findBestSellerProducts(Pageable pageable);
+    
+    @Query("SELECT p FROM Product p WHERE p.category.categoryId = :categoryId ORDER BY p.soldQuantity DESC")
+    List<Product> findBestSellerProductsByCategory(@Param("categoryId") Long categoryId, Pageable pageable);
+    
+    @Query("SELECT p FROM Product p WHERE p.soldQuantity >= :minSoldQuantity ORDER BY p.soldQuantity DESC")
+    List<Product> findProductsWithMinimumSales(@Param("minSoldQuantity") Integer minSoldQuantity, Pageable pageable);
+    
+    // New arrival queries based on creation date
+    @Query("SELECT p FROM Product p ORDER BY p.createdAt DESC")
+    List<Product> findNewArrivalProducts(Pageable pageable);
+    
+    @Query("SELECT p FROM Product p WHERE p.category.categoryId = :categoryId ORDER BY p.createdAt DESC")
+    List<Product> findNewArrivalProductsByCategory(@Param("categoryId") Long categoryId, Pageable pageable);
+    
+    @Query("SELECT p FROM Product p WHERE p.createdAt >= :fromDate ORDER BY p.createdAt DESC")
+    List<Product> findProductsFromDate(@Param("fromDate") java.time.LocalDateTime fromDate, Pageable pageable);
 }

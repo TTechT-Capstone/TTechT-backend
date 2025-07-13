@@ -20,8 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 
-import java.util.*;
-
 /**
  * Product Controller with integrated authentication and authorization
  * 
@@ -44,7 +42,7 @@ public class ProductController {
      */
     @GetMapping
     public ResponseEntity<Page<ProductDTO>> getAllProducts(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "productId") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
@@ -165,5 +163,45 @@ public class ProductController {
         ProductDTO updatedProduct = productService.updateStock(id, stockUpdate);
         return ResponseEntity.ok(updatedProduct);
     }
+
+    /**
+     * 11. GET /api/products/best-sellers - Get best selling products
+     */
+    @GetMapping("/best-sellers")
+    public ResponseEntity<List<ProductDTO>> getBestSellerProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> bestSellers = productService.getBestSellerProducts(limit);
+        return ResponseEntity.ok(bestSellers);
+    }
+    
+    /**
+     * 12. GET /api/products/best-sellers/category/{categoryId} - Get best sellers by category
+     */
+    @GetMapping("/best-sellers/category/{categoryId}")
+    public ResponseEntity<List<ProductDTO>> getBestSellersByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> bestSellers = productService.getBestSellerProductsByCategory(categoryId, limit);
+        return ResponseEntity.ok(bestSellers);
+    }
+    
+    /**
+     * 13. GET /api/products/new-arrivals - Get new arrival products
+     */
+    @GetMapping("/new-arrivals")
+    public ResponseEntity<List<ProductDTO>> getNewArrivalProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ProductDTO> newArrivals = productService.getNewArrivalProducts(limit);
+        return ResponseEntity.ok(newArrivals);
+    }
+
+
+//    @GetMapping("/top-selling")
+//    public ResponseEntity<List<ProductDTO>> getTopSellingProducts(
+//            @RequestParam(defaultValue = "5") int minSoldQuantity,
+//            @RequestParam(defaultValue = "20") int limit) {
+//        List<ProductDTO> topSelling = productService.getTopSellingProducts(minSoldQuantity, limit);
+//        return ResponseEntity.ok(topSelling);
+//    }
 
 }

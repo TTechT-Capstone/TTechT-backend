@@ -1,6 +1,5 @@
 package com.example.TTECHT.dto.repsonse;
 
-import com.example.TTECHT.constant.PredefinedRole;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -16,5 +15,9 @@ public class UserResponse {
     String username;
     String firstName;
     String lastName;
+    String email;
+    String phoneNumber;
+    String address;
     List<RoleResponse> roles;
+
 }
