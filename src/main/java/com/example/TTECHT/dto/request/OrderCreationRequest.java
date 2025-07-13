@@ -10,6 +10,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -40,4 +42,6 @@ public class OrderCreationRequest {
 
     @NotNull(message = "Payment method cannot be null")
     private PaymentMethod paymentMethod;
+
+    private List<String> cartItemIds;
 }

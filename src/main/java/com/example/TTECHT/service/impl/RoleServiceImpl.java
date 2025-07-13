@@ -10,7 +10,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.Role;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;

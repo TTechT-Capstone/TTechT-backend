@@ -26,7 +26,7 @@ public class UserController {
     @PostMapping
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
         log.info("Creating user with username: {}", request);
-        System.out.println(request.toString());
+
         return ApiResponse.<UserResponse>builder()
                 .result(userService.createUser(request))
                 .build();

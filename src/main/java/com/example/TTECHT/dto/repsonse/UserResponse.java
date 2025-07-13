@@ -1,6 +1,5 @@
 package com.example.TTECHT.dto.repsonse;
 
-import com.example.TTECHT.constant.PredefinedRole;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

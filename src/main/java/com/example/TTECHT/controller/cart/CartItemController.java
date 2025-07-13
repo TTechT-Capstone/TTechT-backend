@@ -24,13 +24,14 @@ public class CartItemController {
 
     @PostMapping
     ApiResponse<CartItemResponse> addItemToCart(@RequestBody @Valid CartItemRequest request) {
+        System.out.println("Adding item to cart: " + request.getCartId() + request.getProductId() + request.getQuantity());
         return ApiResponse.<CartItemResponse>builder()
                 .result(cartItemService.addItemToCart(request))
                 .build();
     }
 
-    @PostMapping("/remove/{cartId}")
-    ApiResponse<String> removeItemFromCart(@PathVariable Long cartId , @RequestBody @Valid Long itemId) {
+    @PostMapping("/remove/{cartId}/{itemId}")
+    ApiResponse<String> removeItemFromCart(@PathVariable Long cartId , @PathVariable Long itemId) {
         // Logic to remove an item from the cart
         log.info("Removing item with ID {} from cart with ID {}", itemId, cartId);
         System.out.println("DMMMMM");
