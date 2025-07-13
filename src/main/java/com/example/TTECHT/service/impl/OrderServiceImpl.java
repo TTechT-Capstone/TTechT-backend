@@ -1,5 +1,6 @@
 package com.example.TTECHT.service.impl;
 
+import com.example.TTECHT.constant.OrderConstants;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
 import com.example.TTECHT.entity.Product;
@@ -8,6 +9,9 @@ import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.entity.order.Order;
 import com.example.TTECHT.entity.order.OrderItem;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.exception.AppException;
+import com.example.TTECHT.exception.ErrorCode;
+import com.example.TTECHT.mapper.OrderMapper;
 import com.example.TTECHT.repository.ProductRepository;
 import com.example.TTECHT.repository.cart.CartItemRepository;
 import com.example.TTECHT.repository.cart.CartRepository;
@@ -21,11 +25,12 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,169 +43,238 @@ public class OrderServiceImpl implements OrderService {
     CartItemRepository cartItemRepository;
     ProductRepository productRepository;
     OrderItemRepository orderItemRepository;
+    OrderMapper orderMapper;
 
     @Transactional
     public OrderResponse createOrder(Long userId, Long cartId, OrderCreationRequest orderCreationRequest) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
-
-        Optional<Cart> cart = cartRepository.findByUserId(user.getId());
-        if (cart.isEmpty()) {
-            log.error("Cart not found for user ID: {}", userId);
-            throw new IllegalArgumentException("Cart not found for user ID: " + userId);
+        try {
+            log.info("Creating order for user ID: {}, cart ID: {}", userId, cartId);
+            
+            // Validate input
+            validateOrderCreationRequest(orderCreationRequest);
+            
+            // Get user and validate
+            User user = getUserById(userId);
+            
+            // Get cart and validate
+            Cart cart = getAndValidateCart(userId, cartId);
+            
+            // Get and validate cart items
+            List<CartItem> cartItems = getAndValidateCartItems(orderCreationRequest.getCartItemIds(), userId);
+            
+            // Validate stock availability and update stock
+            validateAndUpdateStock(cartItems);
+            
+            // Create order
+            Order order = createOrder(user, orderCreationRequest);
+            
+            // Create order items
+            List<OrderItem> orderItems = createOrderItems(order, cartItems);
+            
+            // Clean up cart items after successful order creation
+            cleanupCartItems(cartItems);
+            
+            // Set order items to order for response
+            order.setOrderItems(orderItems);
+            
+            log.info("Successfully created order {} for user ID: {}", order.getOrderNumber(), userId);
+            return orderMapper.toOrderResponse(order);
+            
+        } catch (AppException e) {
+            log.error("Failed to create order for user ID: {}, error: {}", userId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error creating order for user ID: {}", userId, e);
+            throw new AppException(ErrorCode.ORDER_CREATION_FAILED);
         }
-
-        if (!cart.get().getId().equals(cartId)) {
-            log.error("Cart ID mismatch for user ID: {}, expected: {}, found: {}", userId, cartId, cart.get().getId());
-            throw new IllegalArgumentException("Cart ID mismatch for user ID: " + userId);
+    }
+    
+    private void validateOrderCreationRequest(OrderCreationRequest request) {
+        if (request == null) {
+            throw new AppException(ErrorCode.INVALID_ORDER_DATA);
         }
-
-        String orderName = "ORD-TTECHT" + System.currentTimeMillis();
-       
-        List <CartItem> cartItems = new ArrayList<>();
-        for (String id : orderCreationRequest.getCartItemIds()) {
-            CartItem cartItem = cartItemRepository.findById(Long.parseLong(id))
-                    .orElseThrow(() -> new IllegalArgumentException("Cart item with ID: " + id + " not found in the cart for user ID: " + userId));
-            cartItems.add(cartItem);
+        
+        if (CollectionUtils.isEmpty(request.getCartItemIds())) {
+            throw new AppException(ErrorCode.INVALID_ORDER_DATA);
         }
-
-        List<Product> productsInOrders = new ArrayList<>();
-        for (CartItem item : cartItems) {
-            if (item.getProduct().getStockQuantity() < item.getQuantity()) {
-                log.error("Insufficient stock for product ID: {}, requested: {}, available: {}",
-                        item.getProduct().getProductId(), item.getQuantity(), item.getProduct().getStockQuantity());
-                throw new IllegalArgumentException("Insufficient stock for product ID: " + item.getProduct().getProductId());
+        
+        if (request.getTotalAmount() == null || request.getTotalAmount() <= 0) {
+            throw new AppException(ErrorCode.INVALID_ORDER_DATA);
+        }
+    }
+    
+    private User getUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+    
+    private Cart getAndValidateCart(Long userId, Long cartId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.CART_NOT_FOUND));
+        
+        if (!cart.getId().equals(cartId)) {
+            log.error("Cart ID mismatch for user ID: {}, expected: {}, found: {}", userId, cartId, cart.getId());
+            throw new AppException(ErrorCode.CART_ID_MISMATCH);
+        }
+        
+        return cart;
+    }
+    
+    private List<CartItem> getAndValidateCartItems(List<String> cartItemIds, Long userId) {
+        List<CartItem> cartItems = new ArrayList<>();
+        
+        for (String id : cartItemIds) {
+            try {
+                Long cartItemId = Long.parseLong(id);
+                CartItem cartItem = cartItemRepository.findById(cartItemId)
+                        .orElseThrow(() -> new AppException(ErrorCode.CART_ITEM_NOT_FOUND));
+                
+                // Validate that cart item belongs to the user
+                if (!cartItem.getCart().getUser().getId().equals(userId)) {
+                    throw new AppException(ErrorCode.CART_ITEM_NOT_FOUND);
+                }
+                
+                cartItems.add(cartItem);
+            } catch (NumberFormatException e) {
+                throw new AppException(ErrorCode.INVALID_CART_ITEM_ID);
             }
-
-            // Update product stock
-            item.getProduct().setStockQuantity(item.getProduct().getStockQuantity() - item.getQuantity());
-            productsInOrders.add(item.getProduct());
-            log.info("Updated stock for product ID: {}, new stock: {}", item.getProduct().getProductId(), item.getProduct().getStockQuantity());
         }
-
-        // Save cart items to the cart
-        productRepository.saveAll(productsInOrders);
-
-        // Create and save the order first
-        Order order = Order.builder()
-                .orderNumber(orderName)
-                .totalAmount(orderCreationRequest.getTotalAmount())
-                .orderStatus(orderCreationRequest.getOrderStatus())
-                .contactName(orderCreationRequest.getContactName())
-                .contactEmail(orderCreationRequest.getContactEmail())
-                .contactPhone(orderCreationRequest.getContactPhone())
-                .deliveryAddress(orderCreationRequest.getDeliveryAddress())
-                .promotionCode(orderCreationRequest.getPromotionCode())
-                .paymentMethod(orderCreationRequest.getPaymentMethod())
-                .user(user)
-                .createdBy("system")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        order = orderRepository.save(order);
-
-        // Now create OrderItems with proper entity references
-        List<OrderItem> orderItems = new ArrayList<>();
+        
+        return cartItems;
+    }
+    
+    private void validateAndUpdateStock(List<CartItem> cartItems) {
+        List<Product> productsToUpdate = new ArrayList<>();
+        
         for (CartItem item : cartItems) {
-            OrderItem orderItem = OrderItem.builder()
-                    .order(order)
-                    .product(item.getProduct())
-                    .quantity(item.getQuantity())
-                    .price(item.getProduct().getPrice().doubleValue())
-                    .discountPrice(0.0)
-                    .stockCode("bbnbb")
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            orderItems.add(orderItem);
+            Product product = item.getProduct();
+            
+            if (product.getStockQuantity() < item.getQuantity()) {
+                log.error("Insufficient stock for product ID: {}, requested: {}, available: {}",
+                        product.getProductId(), item.getQuantity(), product.getStockQuantity());
+                throw new AppException(ErrorCode.INSUFFICIENT_STOCK);
+            }
+            
+            // Update product stock
+            product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+            productsToUpdate.add(product);
+            
+            log.info("Updated stock for product ID: {}, new stock: {}", 
+                    product.getProductId(), product.getStockQuantity());
         }
-
-        orderItemRepository.saveAll(orderItems);
-
-        // Set the order items to the order
-        order.setOrderItems(orderItems);
-        log.info("Creating order for user ID: {}, cart ID: {}", userId, cartId);
-
-        return OrderResponse.builder()
-                .id(order.getOrderId())
-                .orderNumber(order.getOrderNumber())
-                .orderStatus(order.getOrderStatus())
-                .totalAmount(order.getTotalAmount())
-                .contactName(order.getContactName())
-                .contactEmail(order.getContactEmail())
-                .contactPhone(order.getContactPhone())
-                .deliveryAddress(order.getDeliveryAddress())
-                .promotionCode(order.getPromotionCode())
-                .paymentMethod(order.getPaymentMethod())
-                .createdBy(order.getCreatedBy())
-                .updatedBy(order.getUpdatedBy())
+        
+        // Save all updated products in batch
+        productRepository.saveAll(productsToUpdate);
+    }
+    
+    private Order createOrder(User user, OrderCreationRequest request) {
+        String orderNumber = generateOrderNumber();
+        LocalDateTime now = LocalDateTime.now();
+        
+        Order order = Order.builder()
+                .orderNumber(orderNumber)
+                .totalAmount(request.getTotalAmount())
+                .orderStatus(request.getOrderStatus())
+                .contactName(request.getContactName())
+                .contactEmail(request.getContactEmail())
+                .contactPhone(request.getContactPhone())
+                .deliveryAddress(request.getDeliveryAddress())
+                .promotionCode(request.getPromotionCode())
+                .paymentMethod(request.getPaymentMethod())
+                .user(user)
+                .createdBy(OrderConstants.DEFAULT_CREATED_BY)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
+        
+        return orderRepository.save(order);
+    }
+    
+    private List<OrderItem> createOrderItems(Order order, List<CartItem> cartItems) {
+        LocalDateTime now = LocalDateTime.now();
+        
+        List<OrderItem> orderItems = cartItems.stream()
+                .map(item -> OrderItem.builder()
+                        .order(order)
+                        .product(item.getProduct())
+                        .quantity(item.getQuantity())
+                        .price(item.getProduct().getPrice().doubleValue())
+                        .discountPrice(OrderConstants.DEFAULT_DISCOUNT_PRICE)
+                        .stockCode(OrderConstants.DEFAULT_STOCK_CODE)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build())
+                .collect(Collectors.toList());
+        
+        return orderItemRepository.saveAll(orderItems);
+    }
+    
+    private void cleanupCartItems(List<CartItem> cartItems) {
+        try {
+            cartItemRepository.deleteAll(cartItems);
+            log.info("Cleaned up {} cart items after order creation", cartItems.size());
+        } catch (Exception e) {
+            log.warn("Failed to cleanup cart items after order creation: {}", e.getMessage());
+            // Don't throw exception here as order is already created successfully
+        }
+    }
+    
+    private String generateOrderNumber() {
+        return OrderConstants.ORDER_NUMBER_PREFIX + System.currentTimeMillis();
     }
 
     public OrderResponse getOrder(Long orderId) {
-
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found with ID: " + orderId));
-
-        OrderResponse orderResponse = OrderResponse.builder().id(orderId).orderNumber(order.getOrderNumber())
-                .orderStatus(order.getOrderStatus())
-                .totalAmount(order.getTotalAmount())
-                .contactName(order.getContactName())
-                .contactEmail(order.getContactEmail())
-                .contactPhone(order.getContactPhone())
-                .deliveryAddress(order.getDeliveryAddress())
-                .promotionCode(order.getPromotionCode())
-                .paymentMethod(order.getPaymentMethod())
-                .createdBy(order.getCreatedBy())
-                .updatedBy(order.getUpdatedBy())
-                .build();
-
         log.info("Retrieving order with ID: {}", orderId);
-        return orderResponse;
+        
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        return orderMapper.toOrderResponse(order);
     }
 
 
+    @Transactional
     public OrderResponse updateOrder(Long orderId, OrderCreationRequest orderCreationRequest) {
-        // Implementation for updating an order
         log.info("Updating order with ID: {}", orderId);
-        return null;
+        
+        // Validate input
+        validateOrderCreationRequest(orderCreationRequest);
+        
+        // Get existing order
+        Order existingOrder = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        
+        // Update order details (only non-product related fields)
+        existingOrder.setOrderStatus(orderCreationRequest.getOrderStatus());
+        existingOrder.setContactName(orderCreationRequest.getContactName());
+        existingOrder.setContactEmail(orderCreationRequest.getContactEmail());
+        existingOrder.setContactPhone(orderCreationRequest.getContactPhone());
+        existingOrder.setDeliveryAddress(orderCreationRequest.getDeliveryAddress());
+        existingOrder.setPromotionCode(orderCreationRequest.getPromotionCode());
+        existingOrder.setPaymentMethod(orderCreationRequest.getPaymentMethod());
+        existingOrder.setUpdatedAt(LocalDateTime.now());
+        
+        Order updatedOrder = orderRepository.save(existingOrder);
+        
+        log.info("Successfully updated order with ID: {}", orderId);
+        return orderMapper.toOrderResponse(updatedOrder);
     }
 
     public List<OrderResponse> getOrderByUserId(Long userId) {
-        // Implementation for retrieving an order by user ID
-
+        log.info("Retrieving orders for user ID: {}", userId);
+        
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         List<Order> orders = orderRepository.findByUser(user);
         if (orders.isEmpty()) {
-            log.error("No orders found for user ID: {}", userId);
-            throw new IllegalArgumentException("No orders found for user ID: " + userId);
+            log.info("No orders found for user ID: {}", userId);
+            return new ArrayList<>(); // Return empty list instead of throwing exception
         }
 
-        List<OrderResponse> orderResponses = new ArrayList<>();
-        for (Order order : orders) {
-            OrderResponse orderResponse = OrderResponse.builder()
-                    .id(order.getOrderId())
-                    .orderNumber(order.getOrderNumber())
-                    .orderStatus(order.getOrderStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .contactName(order.getContactName())
-                    .contactEmail(order.getContactEmail())
-                    .contactPhone(order.getContactPhone())
-                    .deliveryAddress(order.getDeliveryAddress())
-                    .promotionCode(order.getPromotionCode())
-                    .paymentMethod(order.getPaymentMethod())
-                    .createdBy(order.getCreatedBy())
-                    .updatedBy(order.getUpdatedBy())
-                    .build();
-            orderResponses.add(orderResponse);
-        }
-
-        log.info("Retrieving orders for user ID: {}", userId);  
-        return orderResponses;
+        return orders.stream()
+                .map(orderMapper::toOrderResponse)
+                .collect(Collectors.toList());
     }
 }
 
