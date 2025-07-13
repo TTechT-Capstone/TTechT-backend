@@ -63,6 +63,7 @@ public class UserServiceImpl implements UserService {
         roleRepository.findByName(PredefinedRole.USER_ROLE).ifPresent(roles::add);
 
         user.setRoles(roles);
+        System.out.println(user);
 
         try {
             user = userRepository.save(user);

@@ -35,5 +35,6 @@ public class UserCreationRequest {
     @NotBlank(message = "Phone number cannot be blank")
     private String phoneNumber;
 
-    // should consider the role for the account 
+   private Boolean isActive = true;
+
 }
