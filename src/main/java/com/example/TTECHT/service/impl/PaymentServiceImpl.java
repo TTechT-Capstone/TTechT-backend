@@ -124,15 +124,17 @@ public class PaymentServiceImpl implements PaymentService {
         paymentItems.forEach(item -> item.setPayment(savedPayment));
         savedPayment.setItems(paymentItems);
         
-        // Create Stripe Checkout Session
+        // Create Stripe Checkout Session for Embedded Checkout
         Map<String, String> metadata = new HashMap<>();
         metadata.put("payment_id", savedPayment.getPaymentId().toString());
         metadata.put("user_id", user.getId().toString());
+        metadata.put("customer_email", savedPayment.getCustomerEmail());
+        metadata.put("customer_name", savedPayment.getCustomerName());
         
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
-                .setSuccessUrl(request.getSuccessUrl() != null ? request.getSuccessUrl() : successUrl)
-                .setCancelUrl(request.getCancelUrl() != null ? request.getCancelUrl() : cancelUrl)
+                .setUiMode(SessionCreateParams.UiMode.EMBEDDED) // Important for EmbeddedCheckout
+                .setReturnUrl(request.getSuccessUrl() != null ? request.getSuccessUrl() : successUrl + "?session_id={CHECKOUT_SESSION_ID}")
                 .addAllLineItem(lineItems)
                 .setCustomerEmail(savedPayment.getCustomerEmail())
                 .putAllMetadata(metadata)
@@ -148,7 +150,9 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentResponse.builder()
                 .sessionId(session.getId())
                 .paymentIntentId(session.getPaymentIntent())
-                .checkoutUrl(session.getUrl())
+                .clientSecret(session.getClientSecret()) // This is the session client secret
+                .amount(totalAmount)
+                .currency("USD")
                 .status(session.getStatus())
                 .paymentId(savedPayment.getPaymentId())
                 .build();
