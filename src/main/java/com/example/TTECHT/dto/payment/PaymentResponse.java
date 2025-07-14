@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,4 +18,6 @@ public class PaymentResponse {
     private String checkoutUrl;
     private String status;
     private Long paymentId;
+    private BigDecimal amount;
+    private String currency;
 }

@@ -31,7 +31,7 @@ public class PaymentController {
     private final PaymentService paymentService;
     
     /**
-     * Create Stripe Checkout Session
+     * Create Stripe Embedded Checkout Session with Client Secret
      */
     @PostMapping("/checkout")
     @PreAuthorize("hasRole('USER') or hasRole('SELLER') or hasRole('ADMIN')")
@@ -42,7 +42,7 @@ public class PaymentController {
             PaymentResponse response = paymentService.createCheckoutSession(request, authentication.getName());
             return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                     .code(200)
-                    .message("Checkout session created successfully")
+                    .message("Embedded checkout session created successfully")
                     .result(response)
                     .build());
         } catch (StripeException e) {
