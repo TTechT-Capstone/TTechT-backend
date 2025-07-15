@@ -19,7 +19,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -87,6 +89,39 @@ public class PaymentController {
                     .code(400)
                     .message(e.getMessage())
                     .build());
+        }
+    }
+    
+    /**
+     * Get payment status by session ID for frontend polling
+     */
+    @GetMapping("/status/{sessionId}")
+    @PreAuthorize("hasRole('USER') or hasRole('SELLER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStatus(@PathVariable String sessionId) {
+        try {
+            PaymentDTO payment = paymentService.getPaymentByStripeSessionId(sessionId);
+            
+            Map<String, Object> status = new HashMap<>();
+            status.put("paymentId", payment.getPaymentId());
+            status.put("sessionId", sessionId);
+            status.put("status", payment.getStatus());
+            status.put("amount", payment.getAmount());
+            status.put("currency", payment.getCurrency());
+            status.put("customerEmail", payment.getCustomerEmail());
+            status.put("customerName", payment.getCustomerName());
+            status.put("paidAt", payment.getPaidAt());
+            status.put("createdAt", payment.getCreatedAt());
+            
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
+                .code(200)
+                .message("Payment status retrieved successfully")
+                .result(status)
+                .build());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Map<String, Object>>builder()
+                .code(400)
+                .message("Payment not found: " + e.getMessage())
+                .build());
         }
     }
     
@@ -232,7 +267,7 @@ public class PaymentController {
     /**
      * Get payments by status (Admin only)
      */
-    @GetMapping("/status/{status}")
+    @GetMapping("/status-filter/{status}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentDTO>>> getPaymentsByStatus(@PathVariable PaymentStatus status) {
         try {
