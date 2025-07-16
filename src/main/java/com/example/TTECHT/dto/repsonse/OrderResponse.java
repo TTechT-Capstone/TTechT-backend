@@ -1,6 +1,8 @@
 package com.example.TTECHT.dto.repsonse;
 
 
+import java.util.List;
+import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,13 +17,14 @@ public class OrderResponse {
     private Long id;
     private String orderNumber;
     private Double totalAmount;
-    private String orderStatus;
+    private OrderStatus orderStatus;
     private String contactName;
     private String contactEmail;
     private String contactPhone;
     private String deliveryAddress;
     private String promotionCode;
     private PaymentMethod paymentMethod;
+    private List<OrderItemReponse> orderItems;
     private String createdBy;
     private String updatedBy;
 }

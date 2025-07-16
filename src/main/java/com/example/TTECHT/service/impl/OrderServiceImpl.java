@@ -1,6 +1,7 @@
 package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.constant.OrderConstants;
+import com.example.TTECHT.dto.repsonse.OrderItemReponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
 import com.example.TTECHT.entity.Product;
@@ -9,6 +10,8 @@ import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.entity.order.Order;
 import com.example.TTECHT.entity.order.OrderItem;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.OrderStatus;
+import com.example.TTECHT.enumuration.PaymentMethod;
 import com.example.TTECHT.exception.AppException;
 import com.example.TTECHT.exception.ErrorCode;
 import com.example.TTECHT.mapper.OrderMapper;
@@ -174,13 +177,13 @@ public class OrderServiceImpl implements OrderService {
         Order order = Order.builder()
                 .orderNumber(orderNumber)
                 .totalAmount(request.getTotalAmount())
-                .orderStatus(request.getOrderStatus())
+                .orderStatus(OrderStatus.CREATED)
                 .contactName(request.getContactName())
                 .contactEmail(request.getContactEmail())
                 .contactPhone(request.getContactPhone())
                 .deliveryAddress(request.getDeliveryAddress())
                 .promotionCode(request.getPromotionCode())
-                .paymentMethod(request.getPaymentMethod())
+                .paymentMethod(PaymentMethod.CARD)
                 .user(user)
                 .createdBy(OrderConstants.DEFAULT_CREATED_BY)
                 .createdAt(now)
@@ -229,7 +232,31 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
-        return orderMapper.toOrderResponse(order);
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(orderId);
+        List<OrderItemReponse> orderItemResponses = orderItems.stream()
+                .map(item -> OrderItemReponse.builder()
+                        .id(item.getOrderItemId())
+                        .productName(item.getProduct().getName())
+                        .price(item.getProduct().getPrice().doubleValue())
+                        .quantity(item.getQuantity())
+                        .discountPrice(item.getDiscountPrice())
+                        .stockCode(item.getStockCode())
+                        .build())
+                .collect(Collectors.toList());
+
+        return OrderResponse.builder()
+                .id(order.getOrderId())
+                .orderNumber(order.getOrderNumber())
+                .totalAmount(order.getTotalAmount())
+                .orderStatus(order.getOrderStatus())
+                .contactName(order.getContactName())
+                .contactEmail(order.getContactEmail())
+                .contactPhone(order.getContactPhone())
+                .deliveryAddress(order.getDeliveryAddress())
+                .promotionCode(order.getPromotionCode())
+                .paymentMethod(order.getPaymentMethod())
+                .orderItems(orderItemResponses)
+                .build();
     }
 
 
@@ -245,13 +272,13 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
         
         // Update order details (only non-product related fields)
-        existingOrder.setOrderStatus(orderCreationRequest.getOrderStatus());
+        // existingOrder.setOrderStatus(orderCreationRequest.getOrderStatus());
         existingOrder.setContactName(orderCreationRequest.getContactName());
         existingOrder.setContactEmail(orderCreationRequest.getContactEmail());
         existingOrder.setContactPhone(orderCreationRequest.getContactPhone());
         existingOrder.setDeliveryAddress(orderCreationRequest.getDeliveryAddress());
         existingOrder.setPromotionCode(orderCreationRequest.getPromotionCode());
-        existingOrder.setPaymentMethod(orderCreationRequest.getPaymentMethod());
+        // existingOrder.setPaymentMethod(orderCreationRequest.getPaymentMethod());
         existingOrder.setUpdatedAt(LocalDateTime.now());
         
         Order updatedOrder = orderRepository.save(existingOrder);
@@ -260,6 +287,23 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toOrderResponse(updatedOrder);
     }
 
+    @Transactional
+    public void updateOrderStatus(Long orderId, OrderStatus orderStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        order.setOrderStatus(orderStatus);
+        orderRepository.save(order);
+    }
+
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        order.setOrderStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+    }
+
+    @Transactional
     public List<OrderResponse> getOrderByUserId(Long userId) {
         log.info("Retrieving orders for user ID: {}", userId);
         
