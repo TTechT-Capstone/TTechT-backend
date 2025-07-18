@@ -131,7 +131,7 @@ public class PaymentServiceImpl implements PaymentService {
         
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
-                .setUiMode(SessionCreateParams.UiMode.EMBEDDED) // Important for EmbeddedCheckout
+                .setUiMode(SessionCreateParams.UiMode.EMBEDDED)
                 .setRedirectOnCompletion(SessionCreateParams.RedirectOnCompletion.NEVER)
                 .addAllLineItem(lineItems)
                 .setCustomerEmail(savedPayment.getCustomerEmail())
