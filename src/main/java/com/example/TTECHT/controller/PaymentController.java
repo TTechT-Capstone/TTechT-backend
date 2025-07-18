@@ -7,6 +7,7 @@ import com.example.TTECHT.dto.request.ApiResponse;
 import com.example.TTECHT.enumuration.PaymentStatus;
 import com.example.TTECHT.service.PaymentService;
 import com.stripe.exception.StripeException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +20,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -290,14 +293,32 @@ public class PaymentController {
      */
     @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeWebhook(
-            @RequestBody String payload,
-            @RequestHeader("Stripe-Signature") String sigHeader) {
+            HttpServletRequest request,
+            @RequestHeader(value = "Stripe-Signature", required = false) String sigHeader) {
+
+        log.info("=== WEBHOOK RECEIVED ===");
+        log.info("Stripe-Signature: {}", sigHeader);
+
+        if (sigHeader == null) {
+            return ResponseEntity.badRequest().body("Missing signature");
+        }
+
+        String payload;
+        try {
+            // Read raw payload to preserve exact bytes
+            payload = request.getReader().lines()
+                    .collect(Collectors.joining("\n"));
+            log.info("Payload length: {}", payload.length());
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body("Failed to read payload");
+        }
+
         try {
             paymentService.handleStripeWebhook(payload, sigHeader);
-            return ResponseEntity.ok("Webhook handled successfully");
+            return ResponseEntity.ok("Success");
         } catch (Exception e) {
-            log.error("Error handling webhook: ", e);
-            return ResponseEntity.badRequest().body("Webhook handling failed");
+            log.error("Webhook failed: ", e);
+            return ResponseEntity.status(500).body("Failed: " + e.getMessage());
         }
     }
 }
