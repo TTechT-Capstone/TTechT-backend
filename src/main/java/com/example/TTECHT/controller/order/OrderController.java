@@ -3,7 +3,7 @@ package com.example.TTECHT.controller.order;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
-import com.example.TTECHT.enumuration.OrderStatus;
+import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -57,9 +57,10 @@ public class OrderController {
     }
     
     @PutMapping("/{orderId}/status")
-    ApiResponse<Void> updateOrderStatus(@PathVariable Long orderId, @RequestBody @Valid OrderStatus orderStatus) {
+    ApiResponse<Void> updateOrderStatus(@PathVariable Long orderId, @RequestBody @Valid UpdateOrderStatusRequest updateOrderStatusRequest) {
         log.info("Update order status with ID: {}", orderId);
-        orderService.updateOrderStatus(orderId, orderStatus);
+        System.out.println("dm" + updateOrderStatusRequest.toString());
+        orderService.updateOrderStatus(orderId, updateOrderStatusRequest);
         return ApiResponse.<Void>builder()
                 .build();
     }
