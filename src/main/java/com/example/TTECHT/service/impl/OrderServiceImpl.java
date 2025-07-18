@@ -4,6 +4,7 @@ import com.example.TTECHT.constant.OrderConstants;
 import com.example.TTECHT.dto.repsonse.OrderItemReponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
+import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.entity.Product;
 import com.example.TTECHT.entity.cart.Cart;
 import com.example.TTECHT.entity.cart.CartItem;
@@ -177,7 +178,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = Order.builder()
                 .orderNumber(orderNumber)
                 .totalAmount(request.getTotalAmount())
-                .orderStatus(OrderStatus.CREATED)
+                .orderStatus(OrderStatus.NEW)
                 .contactName(request.getContactName())
                 .contactEmail(request.getContactEmail())
                 .contactPhone(request.getContactPhone())
@@ -258,6 +259,10 @@ public class OrderServiceImpl implements OrderService {
                 .promotionCode(order.getPromotionCode())
                 .paymentMethod(order.getPaymentMethod())
                 .orderItems(orderItemResponses)
+                .createdAt(order.getCreatedAt().toString())
+                .updatedBy(order.getUpdatedAt().toString())
+                .createdBy(order.getCreatedBy())
+                .updatedBy(order.getUpdatedBy())
                 .build();
     }
 
@@ -290,10 +295,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    public void updateOrderStatus(Long orderId, OrderStatus orderStatus) {
+    public void updateOrderStatus(Long orderId, UpdateOrderStatusRequest orderStatusRequest) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
-        order.setOrderStatus(orderStatus);
+        order.setOrderStatus(OrderStatus.valueOf(orderStatusRequest.getOrderStatus()));
         orderRepository.save(order);
     }
 

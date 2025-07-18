@@ -25,6 +25,8 @@ public class OrderResponse {
     private String promotionCode;
     private PaymentMethod paymentMethod;
     private List<OrderItemReponse> orderItems;
+    private String updatedAt;
+    private String createdAt;
     private String createdBy;
     private String updatedBy;
 }
