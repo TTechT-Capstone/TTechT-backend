@@ -241,6 +241,8 @@ public class OrderServiceImpl implements OrderService {
                         .quantity(item.getQuantity())
                         .discountPrice(item.getDiscountPrice())
                         .stockCode(item.getStockCode())
+                        .createdBy(item.getCreatedAt().toString())
+                        .updatedBy(item.getUpdatedAt().toString())
                         .build())
                 .collect(Collectors.toList());
 
