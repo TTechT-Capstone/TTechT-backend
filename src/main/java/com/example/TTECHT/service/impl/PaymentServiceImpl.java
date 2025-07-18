@@ -401,6 +401,10 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             log.info("🔄 Starting handleCheckoutSessionCompleted");
 
+            // Debug: Print raw event data
+            log.info("🔍 Raw event data object: {}", event.getData());
+            log.info("🔍 Raw event data object type: {}", event.getData().getObject());
+
             Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
 
             if (session == null) {
