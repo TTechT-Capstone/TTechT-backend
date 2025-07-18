@@ -351,7 +351,7 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("🔔 Processing webhook...");
         log.info("🔑 Webhook secret configured: {}", webhookSecret != null ? "YES" : "NO");
         if (webhookSecret != null && webhookSecret.length() > 8) {
-            log.info("🔑 Secret preview: {}****", webhookSecret.substring(0, 8));
+            log.info("🔑 Secret");
         }
         log.info("📝 Signature header: {}", sigHeader);
         log.info("📦 Payload length: {}", payload != null ? payload.length() : 0);
