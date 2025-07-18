@@ -405,7 +405,7 @@ public class PaymentServiceImpl implements PaymentService {
             log.info("🔍 Raw event data object: {}", event.getData());
             log.info("🔍 Raw event data object type: {}", event.getData().getObject());
 
-            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
+            Session session = (Session) event.getData().getObject();
 
             if (session == null) {
                 log.error("❌ Session object is null in webhook event");
