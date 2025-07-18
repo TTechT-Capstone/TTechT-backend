@@ -314,153 +314,417 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
     
+//    @Override
+//    public void handleStripeWebhook(String payload, String sigHeader) {
+//        try {
+//            Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
+//            log.info("Received webhook event: {}", event.getType());
+//
+//            switch (event.getType()) {
+//                case "checkout.session.completed":
+//                    handleCheckoutSessionCompleted(event);
+//                    break;
+//                case "checkout.session.async_payment_succeeded":
+//                    handlePaymentSucceeded(event);
+//                    break;
+//                case "checkout.session.async_payment_failed":
+//                    handlePaymentFailed(event);
+//                    break;
+//                case "payment_intent.succeeded":
+//                    handlePaymentIntentSucceeded(event);
+//                    break;
+//                case "payment_intent.payment_failed":
+//                    handlePaymentIntentFailed(event);
+//                    break;
+//                default:
+//                    log.info("Unhandled event type: {}", event.getType());
+//            }
+//        } catch (Exception e) {
+//            log.error("Error processing webhook: ", e);
+//            throw new RuntimeException("Webhook processing failed: " + e.getMessage());
+//        }
+//    }
+
     @Override
+    @Transactional
     public void handleStripeWebhook(String payload, String sigHeader) {
+        log.info("🔔 Processing webhook...");
+        log.info("🔑 Webhook secret configured: {}", webhookSecret != null ? "YES" : "NO");
+        if (webhookSecret != null && webhookSecret.length() > 8) {
+            log.info("🔑 Secret");
+        }
+        log.info("📝 Signature header: {}", sigHeader);
+        log.info("📦 Payload length: {}", payload != null ? payload.length() : 0);
+
         try {
             Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
-            log.info("Received webhook event: {}", event.getType());
-            
+            log.info("✅ Webhook signature verified successfully - Event type: {}", event.getType());
+            log.info("🆔 Event ID: {}", event.getId());
+
             switch (event.getType()) {
                 case "checkout.session.completed":
+                    log.info("🎯 Processing checkout.session.completed");
                     handleCheckoutSessionCompleted(event);
                     break;
                 case "checkout.session.async_payment_succeeded":
+                    log.info("🎯 Processing checkout.session.async_payment_succeeded");
                     handlePaymentSucceeded(event);
                     break;
                 case "checkout.session.async_payment_failed":
+                    log.info("🎯 Processing checkout.session.async_payment_failed");
                     handlePaymentFailed(event);
                     break;
                 case "payment_intent.succeeded":
+                    log.info("🎯 Processing payment_intent.succeeded");
                     handlePaymentIntentSucceeded(event);
                     break;
                 case "payment_intent.payment_failed":
+                    log.info("🎯 Processing payment_intent.payment_failed");
                     handlePaymentIntentFailed(event);
                     break;
                 default:
-                    log.info("Unhandled event type: {}", event.getType());
+                    log.info("ℹ️ Unhandled event type: {}", event.getType());
             }
+
+            log.info("✅ Webhook processing completed successfully");
+
         } catch (Exception e) {
-            log.error("Error processing webhook: ", e);
+            log.error("❌ Webhook processing failed: ", e);
             throw new RuntimeException("Webhook processing failed: " + e.getMessage());
         }
     }
-    
+
+    /**
+     * Handle checkout session completed event
+     */
     private void handleCheckoutSessionCompleted(Event event) {
         try {
+            log.info("🔄 Starting handleCheckoutSessionCompleted");
+
             Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
-            if (session != null) {
-                String sessionId = session.getId();
-                String paymentStatus = session.getPaymentStatus();
-                
-                log.info("Processing checkout session completed: {} with payment status: {}", sessionId, paymentStatus);
-                
-                // Update payment status in database
-                Payment payment = paymentRepository.findByStripeSessionId(sessionId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
-                
-                if ("paid".equals(paymentStatus)) {
-                    payment.setStatus(PaymentStatus.SUCCEEDED);
-                    payment.setPaidAt(LocalDateTime.now());
-                    updateProductInventory(payment);
-                    log.info("Payment succeeded and inventory updated for session: {}", sessionId);
-                } else if ("unpaid".equals(paymentStatus)) {
-                    payment.setStatus(PaymentStatus.PENDING);
-                    log.info("Payment pending for session: {}", sessionId);
-                }
-                
-                paymentRepository.save(payment);
+
+            if (session == null) {
+                log.error("❌ Session object is null in webhook event");
+                return;
             }
+
+            String sessionId = session.getId();
+            String paymentStatus = session.getPaymentStatus();
+            String paymentIntentId = session.getPaymentIntent();
+
+            log.info("📋 Session Details:");
+            log.info("   Session ID: {}", sessionId);
+            log.info("   Payment Status: {}", paymentStatus);
+            log.info("   Payment Intent ID: {}", paymentIntentId);
+            log.info("   Customer Email: {}", session.getCustomerEmail());
+
+            // Find payment in database
+            log.info("🔍 Looking for payment with session ID: {}", sessionId);
+            Payment payment = paymentRepository.findByStripeSessionId(sessionId)
+                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+
+            log.info("✅ Found payment - ID: {}, Current Status: {}",
+                    payment.getPaymentId(), payment.getStatus());
+
+            PaymentStatus oldStatus = payment.getStatus();
+
+            if ("paid".equals(paymentStatus)) {
+                log.info("💳 Payment is marked as 'paid', updating to SUCCEEDED");
+                payment.setStatus(PaymentStatus.SUCCEEDED);
+                payment.setPaidAt(LocalDateTime.now());
+
+                // Update product inventory only if status changed
+                if (oldStatus != PaymentStatus.SUCCEEDED) {
+                    log.info("📦 Updating inventory for {} items",
+                            payment.getItems() != null ? payment.getItems().size() : 0);
+                    updateProductInventory(payment);
+                    log.info("✅ Inventory updated successfully");
+                } else {
+                    log.info("ℹ️ Payment already succeeded, skipping inventory update");
+                }
+
+            } else if ("unpaid".equals(paymentStatus)) {
+                log.info("⏳ Payment is marked as 'unpaid', keeping as PENDING");
+                payment.setStatus(PaymentStatus.PENDING);
+            } else {
+                log.warn("⚠️ Unexpected payment status: {}", paymentStatus);
+            }
+
+            // Save to database
+            log.info("💾 Saving payment to database...");
+            Payment savedPayment = paymentRepository.save(payment);
+            log.info("✅ Payment saved successfully - New Status: {}", savedPayment.getStatus());
+            log.info("📅 Updated at: {}", savedPayment.getUpdatedAt());
+
+            log.info("🎉 Successfully processed checkout.session.completed for session: {}", sessionId);
+
         } catch (Exception e) {
-            log.error("Error handling checkout session completed: ", e);
+            log.error("❌ Error in handleCheckoutSessionCompleted: ", e);
+            throw e;
         }
     }
-    
+
+    /**
+     * Handle async payment succeeded
+     */
     private void handlePaymentSucceeded(Event event) {
         try {
             Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
             if (session != null) {
                 String sessionId = session.getId();
-                log.info("Processing async payment succeeded for session: {}", sessionId);
-                
+                log.info("🎯 Processing async payment succeeded for session: {}", sessionId);
+
                 Payment payment = paymentRepository.findByStripeSessionId(sessionId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
-                
-                payment.setStatus(PaymentStatus.SUCCEEDED);
-                payment.setPaidAt(LocalDateTime.now());
-                updateProductInventory(payment);
-                paymentRepository.save(payment);
-                
-                log.info("Async payment succeeded and inventory updated for session: {}", sessionId);
+                        .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+
+                if (payment.getStatus() != PaymentStatus.SUCCEEDED) {
+                    payment.setStatus(PaymentStatus.SUCCEEDED);
+                    payment.setPaidAt(LocalDateTime.now());
+                    updateProductInventory(payment);
+                    paymentRepository.save(payment);
+                    log.info("✅ Async payment succeeded and inventory updated for session: {}", sessionId);
+                } else {
+                    log.info("ℹ️ Payment already succeeded for session: {}", sessionId);
+                }
             }
         } catch (Exception e) {
-            log.error("Error handling async payment succeeded: ", e);
+            log.error("❌ Error handling async payment succeeded: ", e);
+            throw e;
         }
     }
-    
+
+    /**
+     * Handle async payment failed
+     */
     private void handlePaymentFailed(Event event) {
         try {
             Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
             if (session != null) {
                 String sessionId = session.getId();
-                log.info("Processing async payment failed for session: {}", sessionId);
-                
+                log.info("🎯 Processing async payment failed for session: {}", sessionId);
+
                 Payment payment = paymentRepository.findByStripeSessionId(sessionId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
-                
+                        .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+
                 payment.setStatus(PaymentStatus.FAILED);
                 payment.setFailureReason("Payment failed via webhook");
                 paymentRepository.save(payment);
-                
-                log.info("Payment failed for session: {}", sessionId);
+
+                log.info("✅ Payment failed for session: {}", sessionId);
             }
         } catch (Exception e) {
-            log.error("Error handling async payment failed: ", e);
+            log.error("❌ Error handling async payment failed: ", e);
+            throw e;
         }
     }
-    
+
+    /**
+     * Handle payment intent succeeded
+     */
     private void handlePaymentIntentSucceeded(Event event) {
         try {
             PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
             if (paymentIntent != null) {
                 String paymentIntentId = paymentIntent.getId();
-                log.info("Processing payment intent succeeded: {}", paymentIntentId);
-                
+                log.info("🎯 Processing payment intent succeeded: {}", paymentIntentId);
+
                 Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntentId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
-                
-                payment.setStatus(PaymentStatus.SUCCEEDED);
-                payment.setPaidAt(LocalDateTime.now());
-                updateProductInventory(payment);
-                paymentRepository.save(payment);
-                
-                log.info("Payment intent succeeded and inventory updated: {}", paymentIntentId);
+                        .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
+
+                if (payment.getStatus() != PaymentStatus.SUCCEEDED) {
+                    payment.setStatus(PaymentStatus.SUCCEEDED);
+                    payment.setPaidAt(LocalDateTime.now());
+                    updateProductInventory(payment);
+                    paymentRepository.save(payment);
+                    log.info("✅ Payment intent succeeded and inventory updated: {}", paymentIntentId);
+                } else {
+                    log.info("ℹ️ Payment already succeeded for payment intent: {}", paymentIntentId);
+                }
             }
         } catch (Exception e) {
-            log.error("Error handling payment intent succeeded: ", e);
+            log.error("❌ Error handling payment intent succeeded: ", e);
+            throw e;
         }
     }
-    
+
+    /**
+     * Handle payment intent failed
+     */
     private void handlePaymentIntentFailed(Event event) {
         try {
             PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
             if (paymentIntent != null) {
                 String paymentIntentId = paymentIntent.getId();
-                log.info("Processing payment intent failed: {}", paymentIntentId);
-                
+                log.info("🎯 Processing payment intent failed: {}", paymentIntentId);
+
                 Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntentId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
-                
+                        .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
+
                 payment.setStatus(PaymentStatus.FAILED);
-                payment.setFailureReason(paymentIntent.getLastPaymentError() != null ? 
-                    paymentIntent.getLastPaymentError().getMessage() : "Payment failed");
+                payment.setFailureReason(paymentIntent.getLastPaymentError() != null ?
+                        paymentIntent.getLastPaymentError().getMessage() : "Payment failed");
                 paymentRepository.save(payment);
-                
-                log.info("Payment intent failed: {}", paymentIntentId);
+
+                log.info("✅ Payment intent failed: {}", paymentIntentId);
             }
         } catch (Exception e) {
-            log.error("Error handling payment intent failed: ", e);
+            log.error("❌ Error handling payment intent failed: ", e);
+            throw e;
         }
     }
+
+//    /**
+//     * Update product inventory when payment succeeds
+//     */
+//    private void updateProductInventory(Payment payment) {
+//        try {
+//            log.info("📦 Starting inventory update for payment ID: {}", payment.getPaymentId());
+//
+//            if (payment.getItems() == null || payment.getItems().isEmpty()) {
+//                log.warn("⚠️ No items found in payment for inventory update");
+//                return;
+//            }
+//
+//            for (PaymentItem item : payment.getItems()) {
+//                Product product = item.getProduct();
+//                int oldStock = product.getStockQuantity();
+//                int oldSold = product.getSoldQuantity();
+//
+//                // Update stock and sold quantities
+//                product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+//                product.setSoldQuantity(product.getSoldQuantity() + item.getQuantity());
+//
+//                log.info("📊 Product {} inventory update:", product.getProductId());
+//                log.info("   Stock: {} → {}", oldStock, product.getStockQuantity());
+//                log.info("   Sold: {} → {}", oldSold, product.getSoldQuantity());
+//
+//                Product savedProduct = productRepository.save(product);
+//                log.info("✅ Product {} saved successfully", savedProduct.getProductId());
+//            }
+//
+//            log.info("✅ All inventory updates completed");
+//        } catch (Exception e) {
+//            log.error("❌ Error updating inventory: ", e);
+//            throw e;
+//        }
+//    }
+    
+//    private void handleCheckoutSessionCompleted(Event event) {
+//        try {
+//            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
+//            if (session != null) {
+//                String sessionId = session.getId();
+//                String paymentStatus = session.getPaymentStatus();
+//
+//                log.info("Processing checkout session completed: {} with payment status: {}", sessionId, paymentStatus);
+//
+//                // Update payment status in database
+//                Payment payment = paymentRepository.findByStripeSessionId(sessionId)
+//                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+//
+//                if ("paid".equals(paymentStatus)) {
+//                    payment.setStatus(PaymentStatus.SUCCEEDED);
+//                    payment.setPaidAt(LocalDateTime.now());
+//                    updateProductInventory(payment);
+//                    log.info("Payment succeeded and inventory updated for session: {}", sessionId);
+//                } else if ("unpaid".equals(paymentStatus)) {
+//                    payment.setStatus(PaymentStatus.PENDING);
+//                    log.info("Payment pending for session: {}", sessionId);
+//                }
+//
+//                paymentRepository.save(payment);
+//            }
+//        } catch (Exception e) {
+//            log.error("Error handling checkout session completed: ", e);
+//        }
+//    }
+//
+//    private void handlePaymentSucceeded(Event event) {
+//        try {
+//            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
+//            if (session != null) {
+//                String sessionId = session.getId();
+//                log.info("Processing async payment succeeded for session: {}", sessionId);
+//
+//                Payment payment = paymentRepository.findByStripeSessionId(sessionId)
+//                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+//
+//                payment.setStatus(PaymentStatus.SUCCEEDED);
+//                payment.setPaidAt(LocalDateTime.now());
+//                updateProductInventory(payment);
+//                paymentRepository.save(payment);
+//
+//                log.info("Async payment succeeded and inventory updated for session: {}", sessionId);
+//            }
+//        } catch (Exception e) {
+//            log.error("Error handling async payment succeeded: ", e);
+//        }
+//    }
+//
+//    private void handlePaymentFailed(Event event) {
+//        try {
+//            Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
+//            if (session != null) {
+//                String sessionId = session.getId();
+//                log.info("Processing async payment failed for session: {}", sessionId);
+//
+//                Payment payment = paymentRepository.findByStripeSessionId(sessionId)
+//                    .orElseThrow(() -> new RuntimeException("Payment not found for session: " + sessionId));
+//
+//                payment.setStatus(PaymentStatus.FAILED);
+//                payment.setFailureReason("Payment failed via webhook");
+//                paymentRepository.save(payment);
+//
+//                log.info("Payment failed for session: {}", sessionId);
+//            }
+//        } catch (Exception e) {
+//            log.error("Error handling async payment failed: ", e);
+//        }
+//    }
+//
+//    private void handlePaymentIntentSucceeded(Event event) {
+//        try {
+//            PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
+//            if (paymentIntent != null) {
+//                String paymentIntentId = paymentIntent.getId();
+//                log.info("Processing payment intent succeeded: {}", paymentIntentId);
+//
+//                Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntentId)
+//                    .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
+//
+//                payment.setStatus(PaymentStatus.SUCCEEDED);
+//                payment.setPaidAt(LocalDateTime.now());
+//                updateProductInventory(payment);
+//                paymentRepository.save(payment);
+//
+//                log.info("Payment intent succeeded and inventory updated: {}", paymentIntentId);
+//            }
+//        } catch (Exception e) {
+//            log.error("Error handling payment intent succeeded: ", e);
+//        }
+//    }
+//
+//    private void handlePaymentIntentFailed(Event event) {
+//        try {
+//            PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
+//            if (paymentIntent != null) {
+//                String paymentIntentId = paymentIntent.getId();
+//                log.info("Processing payment intent failed: {}", paymentIntentId);
+//
+//                Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntentId)
+//                    .orElseThrow(() -> new RuntimeException("Payment not found for payment intent: " + paymentIntentId));
+//
+//                payment.setStatus(PaymentStatus.FAILED);
+//                payment.setFailureReason(paymentIntent.getLastPaymentError() != null ?
+//                    paymentIntent.getLastPaymentError().getMessage() : "Payment failed");
+//                paymentRepository.save(payment);
+//
+//                log.info("Payment intent failed: {}", paymentIntentId);
+//            }
+//        } catch (Exception e) {
+//            log.error("Error handling payment intent failed: ", e);
+//        }
+//    }
     
     @Override
     @Transactional(readOnly = true)
