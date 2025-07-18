@@ -2,6 +2,7 @@ package com.example.TTECHT.entity.order;
 
 
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -30,8 +31,9 @@ public class Order {
     @Column(name = "total_amount")
     private Double totalAmount;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "order_status", length = 255)
-    private String orderStatus;
+    private OrderStatus orderStatus;
 
     @Column(name = "contact_name", length = 255)
     private String contactName;

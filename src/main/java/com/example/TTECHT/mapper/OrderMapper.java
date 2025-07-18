@@ -2,8 +2,12 @@ package com.example.TTECHT.mapper;
 
 
 import com.example.TTECHT.dto.repsonse.OrderResponse;
+import com.example.TTECHT.dto.repsonse.OrderItemReponse;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
 import com.example.TTECHT.entity.order.Order;
+import com.example.TTECHT.entity.order.OrderItem;
+
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -14,7 +18,6 @@ public interface OrderMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "user", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "orderStatus", ignore = true)
     @Mapping(target = "orderNumber", ignore = true)
     @Mapping(target = "totalAmount", ignore = true)
     @Mapping(target = "contactName", ignore = true)
@@ -23,9 +26,17 @@ public interface OrderMapper {
     @Mapping(target = "deliveryAddress", ignore = true)
     @Mapping(target = "promotionCode", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(target = "orderStatus", ignore = true)
+    @Mapping(target = "paymentMethod", ignore = true)
+    @Mapping(target = "orderItems", ignore = true)
     Order toOrder(OrderCreationRequest request);
 
-
+    @Mapping(target = "id", source = "orderItemId")
+    @Mapping(target = "productName", source = "product.name")
+    @Mapping(target = "stockCode", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
+    OrderItemReponse toOrderItemResponse(OrderItem orderItem);
 
     @Mapping(target = "id", source = "orderId")
     @Mapping(target = "orderNumber", source = "orderNumber")
@@ -39,6 +50,7 @@ public interface OrderMapper {
     @Mapping(target = "createdBy", source = "createdBy")
     @Mapping(target = "updatedBy", source = "updatedBy")
     @Mapping(target = "paymentMethod", source = "paymentMethod")
+    @Mapping(target = "orderItems", source = "orderItems")
     OrderResponse toOrderResponse(Order order);
 
 }

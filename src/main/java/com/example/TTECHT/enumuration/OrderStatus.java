@@ -1,0 +1,18 @@
+package com.example.TTECHT.enumuration;
+
+public enum OrderStatus {
+    PENDING,
+    CONFIRMED,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED,
+    CREATED,
+    PAID,
+    REFUNDED,
+    REFUND_REQUESTED,
+    REFUND_APPROVED,
+    REFUND_REJECTED,
+    REFUND_FAILED,
+    REFUND_COMPLETED,
+    REFUND_CANCELLED,
+}

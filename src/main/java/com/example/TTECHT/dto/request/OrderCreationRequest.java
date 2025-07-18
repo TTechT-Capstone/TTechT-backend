@@ -25,9 +25,6 @@ public class OrderCreationRequest {
     @Positive(message = "Total amount must be positive")
     private Double totalAmount;
 
-    @NotBlank(message = "Order status cannot be blank")
-    private String orderStatus;
-
     @NotBlank(message = "Contact name cannot be blank")
     private String contactName;
 
@@ -42,9 +39,6 @@ public class OrderCreationRequest {
     private String deliveryAddress;
 
     private String promotionCode; // Optional
-
-    @NotNull(message = "Payment method cannot be null")
-    private PaymentMethod paymentMethod;
 
     @NotEmpty(message = "Cart item IDs cannot be empty")
     private List<String> cartItemIds;
