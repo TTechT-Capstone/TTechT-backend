@@ -71,4 +71,12 @@ public class OrderController {
         orderService.cancelOrder(orderId);
         return ApiResponse.<Void>builder().build();
     }
+
+    @GetMapping("/all")
+    ApiResponse<List<OrderResponse>> getAllOrders() {
+        log.info("Get all orders");
+        return ApiResponse.<List<OrderResponse>>builder()
+                .result(orderService.getAllOrders())
+                .build();
+    }
 }

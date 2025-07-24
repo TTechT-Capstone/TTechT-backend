@@ -94,6 +94,22 @@ public class SellerServiceImpl implements SellerService {
             Seller seller = sellerRepository.findById(sellerId)
                     .orElseThrow(() -> new AppException(ErrorCode.SELLER_NOT_FOUND));
 
+            if (request.getUsername() != null &&
+                    !request.getUsername().equals(seller.getUser().getUsername()) &&
+                    userRepository.existsByUsername(request.getUsername())) {
+
+                log.warn("Username '{}' already exists", request.getUsername());
+                throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+            }
+
+            if (request.getEmail() != null &&
+                    !request.getEmail().equals(seller.getUser().getEmail()) &&
+                    userRepository.existsByEmail(request.getEmail())) {
+
+                log.warn("Email '{}' already exists", request.getEmail());
+                throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+
             if (request.getStoreName() != null &&
                     !request.getStoreName().equals(seller.getStoreName()) &&
                     sellerRepository.existsByStoreName(request.getStoreName())) {
