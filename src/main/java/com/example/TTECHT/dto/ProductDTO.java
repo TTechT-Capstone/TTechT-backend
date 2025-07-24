@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -22,9 +23,12 @@ public class ProductDTO {
     private String sellerUsername;
     private String sellerName;
     private Integer soldQuantity;
-    private String color;
+    
+    // Changed from single fields to arrays
+    private List<String> colors; // Array of available colors
+    private List<String> sizes;  // Array of available sizes
+    
     private String brand;
-    private String size;
     private Boolean isBestSeller;
     private Boolean isNewArrival;
     private LocalDateTime createdAt;

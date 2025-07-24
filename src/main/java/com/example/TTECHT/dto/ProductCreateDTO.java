@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -35,11 +36,11 @@ public class ProductCreateDTO {
     @PositiveOrZero(message = "Stock quantity must be zero or positive")
     private Integer stockQuantity;
     
-    @NotBlank(message = "Color is required")
-    private String color;
+    // Changed from single fields to arrays
+    private List<String> colors; // Can be null, e.g., ["Red", "Blue", "Green"]
+    
+    private List<String> sizes; // Can be null, e.g., ["S", "M", "L"] or ["L", "XL"]
     
     @NotBlank(message = "Brand is required")
     private String brand;
-    
-    private String size; // Optional field
 }

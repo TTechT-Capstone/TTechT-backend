@@ -4,8 +4,12 @@ import com.example.TTECHT.dto.ProductCreateDTO;
 import com.example.TTECHT.dto.ProductDTO;
 import com.example.TTECHT.entity.Category;
 import com.example.TTECHT.entity.Product;
+import com.example.TTECHT.entity.ProductColor;
+import com.example.TTECHT.entity.ProductSize;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.repository.ProductColorRepository;
 import com.example.TTECHT.repository.ProductRepository;
+import com.example.TTECHT.repository.ProductSizeRepository;
 import com.example.TTECHT.repository.user.UserRepository;
 import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
@@ -29,6 +33,8 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductColorRepository productColorRepository;
+    private final ProductSizeRepository productSizeRepository;
     private final CategoryService categoryService;
     private final UserRepository userRepository;
 
@@ -59,15 +65,37 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
-        product.setColor(productCreateDTO.getColor());
         product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
-        product.setColor(productCreateDTO.getColor());
-        product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
         product.setSeller(seller);
 
         Product savedProduct = productRepository.save(product);
+        
+        // Save colors if provided
+        if (productCreateDTO.getColors() != null && !productCreateDTO.getColors().isEmpty()) {
+            List<ProductColor> colors = productCreateDTO.getColors().stream()
+                    .map(colorName -> {
+                        ProductColor color = new ProductColor();
+                        color.setProduct(savedProduct);
+                        color.setColor(colorName.trim());
+                        return color;
+                    })
+                    .collect(Collectors.toList());
+            productColorRepository.saveAll(colors);
+        }
+        
+        // Save sizes if provided
+        if (productCreateDTO.getSizes() != null && !productCreateDTO.getSizes().isEmpty()) {
+            List<ProductSize> sizes = productCreateDTO.getSizes().stream()
+                    .map(sizeName -> {
+                        ProductSize size = new ProductSize();
+                        size.setProduct(savedProduct);
+                        size.setSize(sizeName.trim());
+                        return size;
+                    })
+                    .collect(Collectors.toList());
+            productSizeRepository.saveAll(sizes);
+        }
+
         return convertToDTO(savedProduct);
     }
 
@@ -82,17 +110,45 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
-        product.setColor(productCreateDTO.getColor());
         product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
 
         Product updatedProduct = productRepository.save(product);
+        
+        // Update colors
+        productColorRepository.deleteByProductId(id);
+        if (productCreateDTO.getColors() != null && !productCreateDTO.getColors().isEmpty()) {
+            List<ProductColor> colors = productCreateDTO.getColors().stream()
+                    .map(colorName -> {
+                        ProductColor color = new ProductColor();
+                        color.setProduct(updatedProduct);
+                        color.setColor(colorName.trim());
+                        return color;
+                    })
+                    .collect(Collectors.toList());
+            productColorRepository.saveAll(colors);
+        }
+        
+        // Update sizes
+        productSizeRepository.deleteByProductId(id);
+        if (productCreateDTO.getSizes() != null && !productCreateDTO.getSizes().isEmpty()) {
+            List<ProductSize> sizes = productCreateDTO.getSizes().stream()
+                    .map(sizeName -> {
+                        ProductSize size = new ProductSize();
+                        size.setProduct(updatedProduct);
+                        size.setSize(sizeName.trim());
+                        return size;
+                    })
+                    .collect(Collectors.toList());
+            productSizeRepository.saveAll(sizes);
+        }
+
         return convertToDTO(updatedProduct);
     }
 
     @Override
     public void deleteProduct(Long id) {
         Product product = findEntityById(id);
+        // Colors and sizes will be deleted automatically due to cascade settings
         productRepository.delete(product);
     }
 
@@ -209,10 +265,13 @@ public class ProductServiceImpl implements ProductService {
             dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
         }
         dto.setSoldQuantity(product.getSoldQuantity());
-        dto.setColor(product.getColor());
         dto.setBrand(product.getBrand());
-        dto.setSize(product.getSize());
         dto.setCreatedAt(product.getCreatedAt());
+        
+        // Load colors and sizes
+        dto.setColors(productColorRepository.findColorsByProductId(product.getProductId()));
+        dto.setSizes(productSizeRepository.findSizesByProductId(product.getProductId()));
+        
         return dto;
     }
 
@@ -226,10 +285,13 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", product.getDescription());
         map.put("price", product.getPrice());
         map.put("stockQuantity", product.getStockQuantity());
-        map.put("color", product.getColor());
         map.put("brand", product.getBrand());
-        map.put("size", product.getSize());
         map.put("createdAt", product.getCreatedAt());
+        
+        // Add colors and sizes to map
+        map.put("colors", productColorRepository.findColorsByProductId(product.getProductId()));
+        map.put("sizes", productSizeRepository.findSizesByProductId(product.getProductId()));
+        
         return map;
     }
 
@@ -243,10 +305,10 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", dto.getDescription());
         map.put("price", dto.getPrice());
         map.put("stockQuantity", dto.getStockQuantity());
-        map.put("color", dto.getColor());
         map.put("brand", dto.getBrand());
-        map.put("size", dto.getSize());
         map.put("createdAt", dto.getCreatedAt());
+        map.put("colors", dto.getColors());
+        map.put("sizes", dto.getSizes());
         return map;
     }
     

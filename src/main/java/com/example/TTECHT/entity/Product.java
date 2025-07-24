@@ -8,6 +8,7 @@ import com.example.TTECHT.entity.user.User;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "product")
@@ -47,14 +48,18 @@ public class Product {
     @Column(name = "sold_quantity", nullable = false)
     private Integer soldQuantity = 0;
     
-    @Column(name = "color", nullable = false)
-    private String color;
+    // Removed individual color and size fields, replaced with relationships
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ProductColor> colors;
+    
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ProductSize> sizes;
+    
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ProductImage> images;
     
     @Column(name = "brand", nullable = false)
     private String brand;
-    
-    @Column(name = "size")
-    private String size;
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
