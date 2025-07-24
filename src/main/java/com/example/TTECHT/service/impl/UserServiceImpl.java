@@ -159,7 +159,7 @@ public class UserServiceImpl implements UserService {
         log.info("User with ID {} has been deactivated", userId);
     }
 
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> getUsers() {
         log.info("In method get Users");
         return userRepository.findAll().stream().map(userMapper::toUserResponse).toList();
