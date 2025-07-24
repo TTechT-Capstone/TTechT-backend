@@ -18,10 +18,20 @@ public interface SellerMapper {
     @Mapping(source = "user.email", target = "email")
     @Mapping(source = "user.createdAt", target = "createdAt")
     @Mapping(source = "user.updatedAt", target = "updatedAt")
+    @Mapping(source = "storeName", target = "storeName")
+    @Mapping(source = "storeDescription", target = "storeDescription")
     SellerResponse toSellerResponse(Seller seller);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "user", ignore = true)
+    @Mapping(source = "storeName", target = "storeName")
+    @Mapping(source = "storeDescription", target = "storeDescription")
+    @Mapping(source = "username", target = "user.username")
+    @Mapping(source = "email", target = "user.email")
+    @Mapping(source = "firstName", target = "user.firstName")
+    @Mapping(source = "lastName", target = "user.lastName") 
+    @Mapping(source = "phoneNumber", target = "user.phoneNumber")
+    @Mapping(source = "address", target = "user.address")
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateSeller(@MappingTarget Seller seller, SellerUpdateRequest request);
+    Seller updateSeller(@MappingTarget Seller seller, SellerUpdateRequest request);
 }
