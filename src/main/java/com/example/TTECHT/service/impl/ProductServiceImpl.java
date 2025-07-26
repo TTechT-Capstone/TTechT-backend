@@ -4,12 +4,21 @@ import com.example.TTECHT.dto.ProductCreateDTO;
 import com.example.TTECHT.dto.ProductDTO;
 import com.example.TTECHT.entity.Category;
 import com.example.TTECHT.entity.Product;
+import com.example.TTECHT.entity.ProductColor;
+import com.example.TTECHT.entity.ProductImage;
+import com.example.TTECHT.entity.ProductSize;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.repository.ProductColorRepository;
+import com.example.TTECHT.repository.ProductImageRepository;
 import com.example.TTECHT.repository.ProductRepository;
+import com.example.TTECHT.repository.ProductSizeRepository;
 import com.example.TTECHT.repository.user.UserRepository;
 import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
+import com.example.TTECHT.service.external.WatermarkService;
+import com.example.TTECHT.dto.watermark.WatermarkResponseDTO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,17 +35,37 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductColorRepository productColorRepository;
+    private final ProductSizeRepository productSizeRepository;
+    private final ProductImageRepository productImageRepository;
     private final CategoryService categoryService;
     private final UserRepository userRepository;
+    private final WatermarkService watermarkService;
 
     @Override
     @Transactional(readOnly = true)
     public Page<ProductDTO> getAllProducts(Pageable pageable) {
-        return productRepository.findAll(pageable)
-                .map(this::convertToDTO);
+        Page<Product> products = productRepository.findAll(pageable);
+        
+        // Optimize by bulk loading colors, sizes, and images for all products in the page
+        List<Long> productIds = products.getContent().stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+        
+        if (productIds.isEmpty()) {
+            return products.map(this::convertToDTO);
+        }
+        
+        // Bulk load colors, sizes, and images for all products
+        Map<Long, List<String>> colorsMap = getColorsMapByProductIds(productIds);
+        Map<Long, List<String>> sizesMap = getSizesMapByProductIds(productIds);
+        Map<Long, List<String>> imagesMap = getImagesMapByProductIds(productIds);
+        
+        return products.map(product -> convertToDTOWithPreloadedData(product, colorsMap, sizesMap, imagesMap));
     }
 
     @Override
@@ -59,15 +88,42 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
-        product.setColor(productCreateDTO.getColor());
         product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
-        product.setColor(productCreateDTO.getColor());
-        product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
         product.setSeller(seller);
 
         Product savedProduct = productRepository.save(product);
+        
+        // Save colors if provided
+        if (productCreateDTO.getColors() != null && !productCreateDTO.getColors().isEmpty()) {
+            List<ProductColor> colors = productCreateDTO.getColors().stream()
+                    .map(colorName -> {
+                        ProductColor color = new ProductColor();
+                        color.setProduct(savedProduct);
+                        color.setColor(colorName.trim());
+                        return color;
+                    })
+                    .collect(Collectors.toList());
+            productColorRepository.saveAll(colors);
+        }
+        
+        // Save sizes if provided
+        if (productCreateDTO.getSizes() != null && !productCreateDTO.getSizes().isEmpty()) {
+            List<ProductSize> sizes = productCreateDTO.getSizes().stream()
+                    .map(sizeName -> {
+                        ProductSize size = new ProductSize();
+                        size.setProduct(savedProduct);
+                        size.setSize(sizeName.trim());
+                        return size;
+                    })
+                    .collect(Collectors.toList());
+            productSizeRepository.saveAll(sizes);
+        }
+        
+        // Process images if provided (max 4 images)
+        if (productCreateDTO.getImages() != null && !productCreateDTO.getImages().isEmpty()) {
+            processProductImages(savedProduct, productCreateDTO.getImages(), productCreateDTO.getStoreName());
+        }
+
         return convertToDTO(savedProduct);
     }
 
@@ -82,17 +138,51 @@ public class ProductServiceImpl implements ProductService {
         product.setDescription(productCreateDTO.getDescription());
         product.setPrice(productCreateDTO.getPrice());
         product.setStockQuantity(productCreateDTO.getStockQuantity());
-        product.setColor(productCreateDTO.getColor());
         product.setBrand(productCreateDTO.getBrand());
-        product.setSize(productCreateDTO.getSize());
 
         Product updatedProduct = productRepository.save(product);
+        
+        // Update colors
+        productColorRepository.deleteByProductId(id);
+        if (productCreateDTO.getColors() != null && !productCreateDTO.getColors().isEmpty()) {
+            List<ProductColor> colors = productCreateDTO.getColors().stream()
+                    .map(colorName -> {
+                        ProductColor color = new ProductColor();
+                        color.setProduct(updatedProduct);
+                        color.setColor(colorName.trim());
+                        return color;
+                    })
+                    .collect(Collectors.toList());
+            productColorRepository.saveAll(colors);
+        }
+        
+        // Update sizes
+        productSizeRepository.deleteByProductId(id);
+        if (productCreateDTO.getSizes() != null && !productCreateDTO.getSizes().isEmpty()) {
+            List<ProductSize> sizes = productCreateDTO.getSizes().stream()
+                    .map(sizeName -> {
+                        ProductSize size = new ProductSize();
+                        size.setProduct(updatedProduct);
+                        size.setSize(sizeName.trim());
+                        return size;
+                    })
+                    .collect(Collectors.toList());
+            productSizeRepository.saveAll(sizes);
+        }
+        
+        // Update images
+        productImageRepository.deleteByProductProductId(id);
+        if (productCreateDTO.getImages() != null && !productCreateDTO.getImages().isEmpty()) {
+            processProductImages(updatedProduct, productCreateDTO.getImages(), productCreateDTO.getStoreName());
+        }
+
         return convertToDTO(updatedProduct);
     }
 
     @Override
     public void deleteProduct(Long id) {
         Product product = findEntityById(id);
+        // Colors and sizes will be deleted automatically due to cascade settings
         productRepository.delete(product);
     }
 
@@ -117,8 +207,23 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductDTO> searchProducts(String name, Long categoryId, String storeName, Pageable pageable) {
-        return productRepository.findByFilters(name, categoryId, storeName, pageable)
-                .map(this::convertToDTO);
+        Page<Product> products = productRepository.findByFilters(name, categoryId, storeName, pageable);
+        
+        // Optimize by bulk loading colors, sizes, and images for all products in the page
+        List<Long> productIds = products.getContent().stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+        
+        if (productIds.isEmpty()) {
+            return products.map(this::convertToDTO);
+        }
+        
+        // Bulk load colors, sizes, and images for all products
+        Map<Long, List<String>> colorsMap = getColorsMapByProductIds(productIds);
+        Map<Long, List<String>> sizesMap = getSizesMapByProductIds(productIds);
+        Map<Long, List<String>> imagesMap = getImagesMapByProductIds(productIds);
+        
+        return products.map(product -> convertToDTOWithPreloadedData(product, colorsMap, sizesMap, imagesMap));
     }
 
 
@@ -209,10 +314,14 @@ public class ProductServiceImpl implements ProductService {
             dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
         }
         dto.setSoldQuantity(product.getSoldQuantity());
-        dto.setColor(product.getColor());
         dto.setBrand(product.getBrand());
-        dto.setSize(product.getSize());
         dto.setCreatedAt(product.getCreatedAt());
+        
+        // Load colors, sizes, and images
+        dto.setColors(productColorRepository.findColorsByProductId(product.getProductId()));
+        dto.setSizes(productSizeRepository.findSizesByProductId(product.getProductId()));
+        dto.setImages(productImageRepository.findImageUrlsByProductId(product.getProductId()));
+        
         return dto;
     }
 
@@ -226,10 +335,14 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", product.getDescription());
         map.put("price", product.getPrice());
         map.put("stockQuantity", product.getStockQuantity());
-        map.put("color", product.getColor());
         map.put("brand", product.getBrand());
-        map.put("size", product.getSize());
         map.put("createdAt", product.getCreatedAt());
+        
+        // Add colors, sizes, and images to map
+        map.put("colors", productColorRepository.findColorsByProductId(product.getProductId()));
+        map.put("sizes", productSizeRepository.findSizesByProductId(product.getProductId()));
+        map.put("images", productImageRepository.findImageUrlsByProductId(product.getProductId()));
+        
         return map;
     }
 
@@ -243,10 +356,11 @@ public class ProductServiceImpl implements ProductService {
         map.put("description", dto.getDescription());
         map.put("price", dto.getPrice());
         map.put("stockQuantity", dto.getStockQuantity());
-        map.put("color", dto.getColor());
         map.put("brand", dto.getBrand());
-        map.put("size", dto.getSize());
         map.put("createdAt", dto.getCreatedAt());
+        map.put("colors", dto.getColors());
+        map.put("sizes", dto.getSizes());
+        map.put("images", dto.getImages());
         return map;
     }
     
@@ -313,6 +427,125 @@ public class ProductServiceImpl implements ProductService {
         // Mark as new arrival if created within last 30 days
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         dto.setIsNewArrival(product.getCreatedAt().isAfter(thirtyDaysAgo));
+        return dto;
+    }
+    
+    /**
+     * Process product images by calling watermark service and saving the resulting URLs
+     * 
+     * @param product The saved product entity
+     * @param imageBase64List List of base64 encoded images (max 4)
+     * @param storeName Store name for watermarking
+     */
+    private void processProductImages(Product product, List<String> imageBase64List, String storeName) {
+        if (imageBase64List == null || imageBase64List.isEmpty()) {
+            return;
+        }
+        
+        // Validate max 4 images
+        if (imageBase64List.size() > 4) {
+            throw new RuntimeException("Maximum 4 images allowed per product");
+        }
+        
+        for (int i = 0; i < imageBase64List.size(); i++) {
+            String imageBase64 = imageBase64List.get(i);
+            
+            if (imageBase64 == null || imageBase64.trim().isEmpty()) {
+                continue; // Skip empty images
+            }
+            
+            try {
+                // Call watermark service for each image
+//                WatermarkResponseDTO watermarkResponse = watermarkService.addWatermark(imageBase64, storeName);
+                WatermarkResponseDTO watermarkResponse = watermarkService.addWatermark(imageBase64, storeName);
+                if (watermarkResponse.isSuccess() && watermarkResponse.getImageUrl() != null) {
+                    // Save the image URL to database
+                    ProductImage productImage = new ProductImage();
+                    productImage.setProduct(product);
+                    productImage.setUrlImage(watermarkResponse.getImageUrl());
+                    productImageRepository.save(productImage);
+                    
+                    log.info("Successfully processed image {} for product {}", i + 1, product.getProductId());
+                } else {
+                    log.warn("Watermark service failed for image {} of product {}: {}", 
+                        i + 1, product.getProductId(), watermarkResponse.getMessage());
+                    throw new RuntimeException("Failed to process image " + (i + 1) + ": " + watermarkResponse.getMessage());
+                }
+                
+            } catch (Exception e) {
+                log.error("Error processing image {} for product {}", i + 1, product.getProductId(), e);
+                throw new RuntimeException("Failed to process image " + (i + 1) + ": " + e.getMessage(), e);
+            }
+        }
+        
+        log.info("Successfully processed {} images for product {}", imageBase64List.size(), product.getProductId());
+    }
+    
+    /**
+     * Bulk load colors for multiple products to avoid N+1 queries
+     */
+    private Map<Long, List<String>> getColorsMapByProductIds(List<Long> productIds) {
+        List<ProductColor> allColors = productColorRepository.findByProductProductIdIn(productIds);
+        return allColors.stream()
+                .collect(Collectors.groupingBy(
+                    color -> color.getProduct().getProductId(),
+                    Collectors.mapping(ProductColor::getColor, Collectors.toList())
+                ));
+    }
+    
+    /**
+     * Bulk load sizes for multiple products to avoid N+1 queries
+     */
+    private Map<Long, List<String>> getSizesMapByProductIds(List<Long> productIds) {
+        List<ProductSize> allSizes = productSizeRepository.findByProductProductIdIn(productIds);
+        return allSizes.stream()
+                .collect(Collectors.groupingBy(
+                    size -> size.getProduct().getProductId(),
+                    Collectors.mapping(ProductSize::getSize, Collectors.toList())
+                ));
+    }
+    
+    /**
+     * Bulk load images for multiple products to avoid N+1 queries
+     */
+    private Map<Long, List<String>> getImagesMapByProductIds(List<Long> productIds) {
+        List<ProductImage> allImages = productImageRepository.findByProductProductIdIn(productIds);
+        return allImages.stream()
+                .collect(Collectors.groupingBy(
+                    image -> image.getProduct().getProductId(),
+                    Collectors.mapping(ProductImage::getUrlImage, Collectors.toList())
+                ));
+    }
+    
+    /**
+     * Convert Product to DTO with preloaded colors, sizes, and images data
+     */
+    private ProductDTO convertToDTOWithPreloadedData(Product product, 
+                                                    Map<Long, List<String>> colorsMap,
+                                                    Map<Long, List<String>> sizesMap,
+                                                    Map<Long, List<String>> imagesMap) {
+        ProductDTO dto = new ProductDTO();
+        dto.setProductId(product.getProductId());
+        dto.setStoreName(product.getStoreName());
+        dto.setCategoryId(product.getCategory().getCategoryId());
+        dto.setCategoryName(product.getCategory().getName());
+        dto.setName(product.getName());
+        dto.setDescription(product.getDescription());
+        dto.setPrice(product.getPrice());
+        dto.setStockQuantity(product.getStockQuantity());
+        if (product.getSeller() != null) {
+            dto.setSellerUsername(product.getSeller().getUsername());
+            dto.setSellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName());
+        }
+        dto.setSoldQuantity(product.getSoldQuantity());
+        dto.setBrand(product.getBrand());
+        dto.setCreatedAt(product.getCreatedAt());
+        
+        // Use preloaded data instead of making individual queries
+        dto.setColors(colorsMap.getOrDefault(product.getProductId(), List.of()));
+        dto.setSizes(sizesMap.getOrDefault(product.getProductId(), List.of()));
+        dto.setImages(imagesMap.getOrDefault(product.getProductId(), List.of()));
+        
         return dto;
     }
 }

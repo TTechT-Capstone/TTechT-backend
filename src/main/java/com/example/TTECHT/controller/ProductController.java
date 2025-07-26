@@ -3,6 +3,8 @@ package com.example.TTECHT.controller;
 import com.example.TTECHT.dto.ProductCreateDTO;
 import com.example.TTECHT.dto.ProductDTO;
 import com.example.TTECHT.service.ProductService;
+import com.example.TTECHT.service.external.WatermarkService;
+import com.example.TTECHT.dto.watermark.WatermarkResponseDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,7 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
+    private final WatermarkService watermarkService;
 
     /**
      * 1. GET /api/products - Get all products with pagination
@@ -193,6 +196,41 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int limit) {
         List<ProductDTO> newArrivals = productService.getNewArrivalProducts(limit);
         return ResponseEntity.ok(newArrivals);
+    }
+    
+    /**
+     * Test endpoint for watermark service - For development/testing only
+     */
+    @PostMapping("/test-watermark")
+    public ResponseEntity<Map<String, Object>> testWatermarkService(
+            @RequestBody Map<String, String> request) {
+        try {
+            String imageBase64 = request.get("imageBase64");
+            String storeName = request.get("storeName");
+            
+            if (imageBase64 == null || storeName == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Both imageBase64 and storeName are required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            
+            // Call the actual watermark service
+            WatermarkResponseDTO watermarkResponse = watermarkService.addWatermark(imageBase64, storeName);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", watermarkResponse.isSuccess());
+            response.put("message", watermarkResponse.getMessage());
+            response.put("imageUrl", watermarkResponse.getImageUrl());
+            response.put("data", watermarkResponse.getData());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
     }
 
 
