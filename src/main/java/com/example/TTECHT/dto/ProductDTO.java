@@ -27,6 +27,7 @@ public class ProductDTO {
     // Changed from single fields to arrays
     private List<String> colors; // Array of available colors
     private List<String> sizes;  // Array of available sizes
+    private List<String> images; // Array of image URLs
     
     private String brand;
     private Boolean isBestSeller;

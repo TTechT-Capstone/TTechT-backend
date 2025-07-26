@@ -14,6 +14,8 @@ public interface ProductColorRepository extends JpaRepository<ProductColor, Long
     
     List<ProductColor> findByProductProductId(Long productId);
     
+    List<ProductColor> findByProductProductIdIn(List<Long> productIds);
+    
     @Modifying
     @Query("DELETE FROM ProductColor pc WHERE pc.product.productId = :productId")
     void deleteByProductId(@Param("productId") Long productId);

@@ -14,6 +14,8 @@ public interface ProductSizeRepository extends JpaRepository<ProductSize, Long> 
     
     List<ProductSize> findByProductProductId(Long productId);
     
+    List<ProductSize> findByProductProductIdIn(List<Long> productIds);
+    
     @Modifying
     @Query("DELETE FROM ProductSize ps WHERE ps.product.productId = :productId")
     void deleteByProductId(@Param("productId") Long productId);
