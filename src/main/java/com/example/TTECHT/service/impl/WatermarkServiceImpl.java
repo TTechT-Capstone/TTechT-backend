@@ -80,7 +80,7 @@ public class WatermarkServiceImpl implements WatermarkService {
     public WatermarkResponse getWatermarkByStoreName(String storeName) {
 
         log.info("Retrieving watermark for store: {}", storeName);
-        // check if store exists
+        // check if store existss
         sellerRepository.findByStoreName(storeName)
             .orElseThrow(() -> new AppException(ErrorCode.STORE_NAME_NOT_FOUND, "Store does not exist"));
 
