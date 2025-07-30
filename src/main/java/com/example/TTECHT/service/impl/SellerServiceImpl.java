@@ -91,7 +91,7 @@ public class SellerServiceImpl implements SellerService {
 
         try {
 
-            Seller seller = sellerRepository.findById(sellerId)
+            Seller seller = sellerRepository.findByUserId(Long.valueOf(sellerId))
                     .orElseThrow(() -> new AppException(ErrorCode.SELLER_NOT_FOUND));
 
             if (request.getUsername() != null &&

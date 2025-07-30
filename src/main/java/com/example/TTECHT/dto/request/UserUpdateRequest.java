@@ -30,7 +30,7 @@ public class UserUpdateRequest {
     // This should be a List of role names
     private List<String> roles;
 
-    private Boolean isActive;
+    private boolean isActive;
 
     @Override
     public String toString() {

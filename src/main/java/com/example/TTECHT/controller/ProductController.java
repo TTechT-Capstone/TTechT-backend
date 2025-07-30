@@ -201,6 +201,7 @@ public class ProductController {
     /**
      * Test endpoint for watermark service - For development/testing only
      */
+    
     @PostMapping("/test-watermark")
     public ResponseEntity<Map<String, Object>> testWatermarkService(
             @RequestBody Map<String, String> request) {
