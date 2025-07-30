@@ -15,7 +15,12 @@ public interface SellerMapper {
 
     @Mapping(source = "user.id", target = "userId")
     @Mapping(source = "user.username", target = "username")
+    @Mapping(source = "user.firstName", target = "firstName")
+    @Mapping(source = "user.lastName", target = "lastName")
+    @Mapping(source = "user.phoneNumber", target = "phoneNumber")
+    @Mapping(source = "user.address", target = "address")
     @Mapping(source = "user.email", target = "email")
+    @Mapping(source = "user.roles", target = "userRole")
     @Mapping(source = "user.createdAt", target = "createdAt")
     @Mapping(source = "user.updatedAt", target = "updatedAt")
     @Mapping(source = "storeName", target = "storeName")

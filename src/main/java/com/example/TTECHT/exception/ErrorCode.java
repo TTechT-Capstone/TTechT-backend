@@ -41,6 +41,12 @@ public enum ErrorCode {
     ORDER_CREATION_FAILED(3001, "Order creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_ORDER_DATA(3002, "Invalid order data", HttpStatus.BAD_REQUEST),
     ORDER_NOT_FOUND(3003, "Order not found", HttpStatus.NOT_FOUND),
+    WATERMARK_CREATION_FAILED(4001, "Watermark creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    WATERMARK_DELETION_FAILED(4002, "Watermark deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    WATERMARK_NOT_FOUND(4003, "Watermark not found", HttpStatus.NOT_FOUND),
+    WATERMARK_UPDATE_FAILED(4004, "Watermark update failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    WATERMARK_ALREADY_EXISTS(4005, "Watermark already exists", HttpStatus.BAD_REQUEST),
+    STORE_NAME_NOT_FOUND(4006, "Store name not found", HttpStatus.NOT_FOUND)
     ;
 
     ErrorCode(int code, String message, HttpStatus httpStatus) {

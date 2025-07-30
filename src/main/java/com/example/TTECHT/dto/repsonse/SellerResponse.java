@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import com.example.TTECHT.dto.repsonse.RoleResponse;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -15,6 +17,11 @@ public class SellerResponse {
     private Long id;
     private Long userId;
     private String username;
+    private String firstName;
+    private String lastName;
+    private String address;
+    private String phoneNumber;
+    private List<RoleResponse> userRole;
     private String email;
     private String storeName;
     private String storeDescription;

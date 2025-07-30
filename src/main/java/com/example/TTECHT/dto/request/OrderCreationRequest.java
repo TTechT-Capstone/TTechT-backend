@@ -1,7 +1,6 @@
 package com.example.TTECHT.dto.request;
 
 
-import com.example.TTECHT.enumuration.PaymentMethod;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
