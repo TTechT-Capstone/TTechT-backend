@@ -45,6 +45,12 @@ public interface ProductService {
     List<ProductDTO> getNewArrivalProducts(int limit);
     
     List<ProductDTO> getNewArrivalProductsByCategory(Long categoryId, int limit);
+    
+    // Get all products without pagination
+    List<ProductDTO> getAllProductsWithoutPagination();
+    
+    // Get products by user/seller ID
+    List<ProductDTO> getProductsByUserId(Long userId);
 
 //    List<ProductDTO> getProductsByCategory(Long categoryId);
 //
