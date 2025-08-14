@@ -3,6 +3,7 @@ package com.example.TTECHT.service.impl;
 import com.example.TTECHT.constant.OrderConstants;
 import com.example.TTECHT.dto.repsonse.OrderItemReponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
+import com.example.TTECHT.dto.request.CancelOrderRequest;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
 import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.entity.Product;
@@ -207,11 +208,14 @@ public class OrderServiceImpl implements OrderService {
                         .price(item.getProduct().getPrice().doubleValue())
                         .discountPrice(OrderConstants.DEFAULT_DISCOUNT_PRICE)
                         .stockCode(OrderConstants.DEFAULT_STOCK_CODE)
+                        .selectedColor(item.getSelectedColor())
+                        .selectedSize(item.getSelectedSize())
                         .createdAt(now)
                         .updatedAt(now)
                         .build())
                 .collect(Collectors.toList());
         
+        log.info("Created {} order items with cart item attributes (color, size, images)", orderItems.size());
         return orderItemRepository.saveAll(orderItems);
     }
     
@@ -244,6 +248,8 @@ public class OrderServiceImpl implements OrderService {
                         .quantity(item.getQuantity())
                         .discountPrice(item.getDiscountPrice())
                         .stockCode(item.getStockCode())
+                        .selectedColor(item.getSelectedColor())
+                        .selectedSize(item.getSelectedSize())
                         .createdBy(item.getCreatedAt().toString())
                         .updatedBy(item.getUpdatedAt().toString())
                         .build())
@@ -305,11 +311,57 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    public void cancelOrder(Long orderId) {
+    public void cancelOrder(Long orderId, CancelOrderRequest request) {
+        log.info("Cancelling order with ID: {} with reason: {}", orderId, request.getCancellationReason().getDescription());
+        
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        
+        // Check if order can be cancelled (only if not already cancelled or completed)
+        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
+            log.error("Order with ID {} is already cancelled", orderId);
+            throw new AppException(ErrorCode.ORDER_ALREADY_CANCELLED);
+        }
+        
+        if (order.getOrderStatus() == OrderStatus.COMPLETED) {
+            log.error("Cannot cancel order with ID {} as it is already completed", orderId);
+            throw new AppException(ErrorCode.ORDER_CANNOT_BE_CANCELLED);
+        }
+        
+        // Restore product stock when cancelling
+        restoreProductStockOnCancellation(order);
+        
+        // Update order status and cancellation details
         order.setOrderStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(request.getCancellationReason());
+        order.setCancelledAt(LocalDateTime.now());
+        order.setCancelledBy(request.getCancelledBy() != null ? request.getCancelledBy() : "SYSTEM");
+        order.setUpdatedAt(LocalDateTime.now());
+        
         orderRepository.save(order);
+        
+        log.info("Successfully cancelled order with ID: {}", orderId);
+    }
+    
+    private void restoreProductStockOnCancellation(Order order) {
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+        List<Product> productsToUpdate = new ArrayList<>();
+        
+        for (OrderItem item : orderItems) {
+            Product product = item.getProduct();
+            int restoredStock = product.getStockQuantity() + item.getQuantity();
+            product.setStockQuantity(restoredStock);
+            productsToUpdate.add(product);
+            
+            log.info("Restored {} units of product ID: {} (new stock: {})", 
+                    item.getQuantity(), product.getProductId(), restoredStock);
+        }
+        
+        // Save all updated products in batch
+        if (!productsToUpdate.isEmpty()) {
+            productRepository.saveAll(productsToUpdate);
+            log.info("Restored stock for {} products after order cancellation", productsToUpdate.size());
+        }
     }
 
     @Transactional

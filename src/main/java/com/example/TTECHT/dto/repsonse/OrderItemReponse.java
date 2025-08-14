@@ -18,4 +18,6 @@ public class OrderItemReponse {
     private String stockCode;
     private String createdBy;
     private String updatedBy;
+    private String selectedColor;
+    private String selectedSize;
 }

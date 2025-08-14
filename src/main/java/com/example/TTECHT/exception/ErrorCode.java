@@ -41,6 +41,8 @@ public enum ErrorCode {
     ORDER_CREATION_FAILED(3001, "Order creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_ORDER_DATA(3002, "Invalid order data", HttpStatus.BAD_REQUEST),
     ORDER_NOT_FOUND(3003, "Order not found", HttpStatus.NOT_FOUND),
+    ORDER_ALREADY_CANCELLED(3004, "Order is already cancelled", HttpStatus.BAD_REQUEST),
+    ORDER_CANNOT_BE_CANCELLED(3005, "Order cannot be cancelled at this stage", HttpStatus.BAD_REQUEST),
     WATERMARK_CREATION_FAILED(4001, "Watermark creation failed", HttpStatus.INTERNAL_SERVER_ERROR),
     WATERMARK_DELETION_FAILED(4002, "Watermark deletion failed", HttpStatus.INTERNAL_SERVER_ERROR),
     WATERMARK_NOT_FOUND(4003, "Watermark not found", HttpStatus.NOT_FOUND),
