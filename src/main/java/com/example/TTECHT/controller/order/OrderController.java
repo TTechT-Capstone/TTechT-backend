@@ -66,10 +66,10 @@ public class OrderController {
                 .build();
     }
 
-    @PutMapping("/{orderId}/cancel")
-    ApiResponse<String> cancelOrder(@PathVariable Long orderId, @RequestBody @Valid CancelOrderRequest request) {
-        log.info("Cancel order with ID: {} with reason: {}", orderId, request.getCancellationReason().getDescription());
-        orderService.cancelOrder(orderId, request);
+    @PutMapping("/{userId}/{orderId}/cancel")
+    ApiResponse<String> cancelOrder(@PathVariable Long userId, @PathVariable Long orderId, @RequestBody @Valid CancelOrderRequest request) {
+        log.info("Cancel order with ID: {} with reason: {}", orderId, request.getCancellationReason());
+        orderService.cancelOrder(userId, orderId, request);
         return ApiResponse.<String>builder()
                 .result("Order cancelled successfully")
                 .build();
