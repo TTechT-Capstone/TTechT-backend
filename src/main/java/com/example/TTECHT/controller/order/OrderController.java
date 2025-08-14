@@ -2,6 +2,7 @@ package com.example.TTECHT.controller.order;
 
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
+import com.example.TTECHT.dto.request.CancelOrderRequest;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
 import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.service.OrderService;
@@ -66,10 +67,12 @@ public class OrderController {
     }
 
     @PutMapping("/{orderId}/cancel")
-    ApiResponse<Void> cancelOrder(@PathVariable Long orderId) {
-        log.info("Cancel order with ID: {}", orderId);
-        orderService.cancelOrder(orderId);
-        return ApiResponse.<Void>builder().build();
+    ApiResponse<String> cancelOrder(@PathVariable Long orderId, @RequestBody @Valid CancelOrderRequest request) {
+        log.info("Cancel order with ID: {} with reason: {}", orderId, request.getCancellationReason().getDescription());
+        orderService.cancelOrder(orderId, request);
+        return ApiResponse.<String>builder()
+                .result("Order cancelled successfully")
+                .build();
     }
 
     @GetMapping("/all")
