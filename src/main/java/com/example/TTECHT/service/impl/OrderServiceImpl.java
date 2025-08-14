@@ -11,7 +11,9 @@ import com.example.TTECHT.entity.cart.Cart;
 import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.entity.order.Order;
 import com.example.TTECHT.entity.order.OrderItem;
+import com.example.TTECHT.entity.user.Role;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.CancellationReason;
 import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import com.example.TTECHT.exception.AppException;
@@ -311,9 +313,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    public void cancelOrder(Long orderId, CancelOrderRequest request) {
-        log.info("Cancelling order with ID: {} with reason: {}", orderId, request.getCancellationReason().getDescription());
+    public void cancelOrder(Long userId, Long orderId, CancelOrderRequest request) {
+        log.info("Cancelling order with ID: {} with reason: {}", orderId, request.getCancellationReason());
         
+        User user = getUserById(userId);
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
         
@@ -327,15 +331,15 @@ public class OrderServiceImpl implements OrderService {
             log.error("Cannot cancel order with ID {} as it is already completed", orderId);
             throw new AppException(ErrorCode.ORDER_CANNOT_BE_CANCELLED);
         }
-        
+
         // Restore product stock when cancelling
         restoreProductStockOnCancellation(order);
         
         // Update order status and cancellation details
         order.setOrderStatus(OrderStatus.CANCELLED);
-        order.setCancellationReason(request.getCancellationReason());
+        order.setCancellationReason(CancellationReason.valueOf(request.getCancellationReason()));
         order.setCancelledAt(LocalDateTime.now());
-        order.setCancelledBy(request.getCancelledBy() != null ? request.getCancelledBy() : "SYSTEM");
+        order.setCancelledBy(user.getRoles() != null ? user.getRoles().stream().map(Role::getName).collect(Collectors.joining(", ")) : "SYSTEM");
         order.setUpdatedAt(LocalDateTime.now());
         
         orderRepository.save(order);

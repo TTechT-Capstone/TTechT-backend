@@ -14,5 +14,5 @@ public interface OrderService {
     List<OrderResponse> getAllOrders();
     OrderResponse updateOrder(Long orderId, OrderCreationRequest orderCreationRequest);
     void updateOrderStatus(Long orderId, UpdateOrderStatusRequest request);
-    void cancelOrder(Long orderId, CancelOrderRequest request);
+    void cancelOrder(Long userId, Long orderId, CancelOrderRequest request);
 }
