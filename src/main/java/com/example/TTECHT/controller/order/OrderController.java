@@ -1,5 +1,6 @@
 package com.example.TTECHT.controller.order;
 
+import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
 import com.example.TTECHT.dto.request.CancelOrderRequest;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -82,4 +84,17 @@ public class OrderController {
                 .result(orderService.getAllOrders())
                 .build();
     }
+
+    @GetMapping("/cancellation-reasons/customer")
+    public ResponseEntity<ApiResponse<List<CancellationReasonResponse>>> getCustomerCancellationReasons() {
+        log.info("Request received to get customer cancellation reasons");
+
+        List<CancellationReasonResponse> reasons = orderService.getCustomerCancellationReasons();
+
+        return ResponseEntity.ok(ApiResponse.<List<CancellationReasonResponse>>builder()
+                .result(reasons)
+                .message("Customer cancellation reasons retrieved successfully")
+                .build());
+    }
+
 }

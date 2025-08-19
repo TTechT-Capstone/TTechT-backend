@@ -1,6 +1,7 @@
 package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.constant.OrderConstants;
+import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
 import com.example.TTECHT.dto.repsonse.OrderItemReponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.CancelOrderRequest;
@@ -38,7 +39,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,6 +56,29 @@ public class OrderServiceImpl implements OrderService {
     ProductRepository productRepository;
     OrderItemRepository orderItemRepository;
     OrderMapper orderMapper;
+
+    private static final Set<CancellationReason> CUSTOMER_REASONS = Set.of(
+            CancellationReason.CUSTOMER_CHANGED_MIND,
+            CancellationReason.FOUND_BETTER_PRICE,
+            CancellationReason.NO_LONGER_NEEDED,
+            CancellationReason.ORDERED_WRONG_ITEM,
+            CancellationReason.ORDERED_WRONG_SIZE,
+            CancellationReason.ORDERED_WRONG_COLOR,
+            CancellationReason.FINANCIAL_CONSTRAINTS,
+            CancellationReason.DELIVERY_TOO_SLOW,
+            CancellationReason.DELIVERY_TOO_EXPENSIVE,
+            CancellationReason.RECEIVED_AS_GIFT,
+            CancellationReason.PRODUCT_REVIEWS_NEGATIVE,
+            CancellationReason.STORE_POLICY_CONCERNS,
+            CancellationReason.PREFER_IN_STORE_PURCHASE,
+            CancellationReason.FAMILY_MEMBER_OBJECTION,
+            CancellationReason.BUDGET_REALLOCATED,
+            CancellationReason.IMPULSE_PURCHASE_REGRET,
+            CancellationReason.PRODUCT_AVAILABILITY_ELSEWHERE,
+            CancellationReason.PROMOTIONAL_OFFER_ENDED,
+            CancellationReason.CHANGE_OF_PLANS,
+            CancellationReason.OTHER
+    );
 
     @Transactional
     public OrderResponse createOrder(Long userId, Long cartId, OrderCreationRequest orderCreationRequest) {
@@ -393,6 +419,25 @@ public class OrderServiceImpl implements OrderService {
         return orders.stream()
                 .map(orderMapper::toOrderResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CancellationReasonResponse> getCustomerCancellationReasons() {
+        log.info("Fetching customer cancellation reasons");
+        return CUSTOMER_REASONS.stream()
+                .map(this::mapToResponse)
+                .sorted(Comparator.comparing(CancellationReasonResponse::getDescription))
+                .collect(Collectors.toList());
+    }
+
+    private CancellationReasonResponse mapToResponse(CancellationReason reason) {
+        String category = CUSTOMER_REASONS.contains(reason) ? "CUSTOMER" : "SYSTEM";
+
+        return CancellationReasonResponse.builder()
+                .code(reason.name())
+                .description(reason.getDescription())
+                .category(category)
+                .build();
     }
 }
 

@@ -1,5 +1,6 @@
 package com.example.TTECHT.service;
 
+import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
 import com.example.TTECHT.dto.request.CancelOrderRequest;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
@@ -15,4 +16,5 @@ public interface OrderService {
     OrderResponse updateOrder(Long orderId, OrderCreationRequest orderCreationRequest);
     void updateOrderStatus(Long orderId, UpdateOrderStatusRequest request);
     void cancelOrder(Long userId, Long orderId, CancelOrderRequest request);
+    List<CancellationReasonResponse> getCustomerCancellationReasons();
 }
