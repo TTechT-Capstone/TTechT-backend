@@ -37,7 +37,7 @@ public class SecurityConfig {
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/roles/all",
             "/api/products", "/api/products/**",
-            "/api/categories", "/api/categories/**", "/api/order/cancellation-reasons/customer"
+            "/api/categories", "/api/categories/**", "/api/v1/orders/cancellation-reasons/customer"
     };
 
     private final CustomJwtDecoder customJwtDecoder;
