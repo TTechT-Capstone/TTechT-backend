@@ -1,11 +1,10 @@
 package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.constant.OrderConstants;
-import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
-import com.example.TTECHT.dto.repsonse.OrderItemReponse;
-import com.example.TTECHT.dto.repsonse.OrderResponse;
+import com.example.TTECHT.dto.repsonse.*;
 import com.example.TTECHT.dto.request.CancelOrderRequest;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
+import com.example.TTECHT.dto.request.SellerOrderFilterRequest;
 import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.entity.Product;
 import com.example.TTECHT.entity.cart.Cart;
@@ -438,6 +437,119 @@ public class OrderServiceImpl implements OrderService {
                 .description(reason.getDescription())
                 .category(category)
                 .build();
+    }
+
+    @Override
+    public List<SellerOrderResponse> getOrdersForSeller(Long sellerId, SellerOrderFilterRequest filterRequest) {
+        log.info("Fetching filtered orders for seller ID: {} with filters: {}", sellerId, filterRequest);
+
+        // Validate seller exists
+        User seller = userRepository.findById(sellerId)
+                .orElseThrow(() -> new AppException(ErrorCode.SELLER_NOT_FOUND));
+
+        // Build query with filters
+        List<Order> filteredOrders = orderRepository.findOrdersForSellerWithFilters(
+                sellerId
+        );
+
+        return filteredOrders.stream()
+                .map(order -> mapToSellerOrderResponse(order, sellerId))
+                .sorted(getSellerOrderComparator(filterRequest))
+                .collect(Collectors.toList());
+    }
+
+    private SellerOrderResponse mapToSellerOrderResponse(Order order, Long sellerId) {
+        // Get only order items that belong to this seller
+        List<OrderItem> sellerOrderItems = orderItemRepository.findByOrderAndProductSellerId(order, sellerId);
+
+        // Calculate seller-specific totals
+        double sellerTotal = sellerOrderItems.stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                .sum();
+
+        int totalSellerItems = sellerOrderItems.stream()
+                .mapToInt(OrderItem::getQuantity)
+                .sum();
+
+        // Map order items to response DTOs
+        List<SellerOrderItemResponse> sellerOrderItemResponses = sellerOrderItems.stream()
+                .map(this::mapToSellerOrderItemResponse)
+                .collect(Collectors.toList());
+
+        // Build customer name
+        String customerName = order.getUser().getFirstName() + " " + order.getUser().getLastName();
+
+        return SellerOrderResponse.builder()
+                .orderId(order.getOrderId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getOrderStatus())
+                .contactName(order.getContactName())
+                .contactEmail(order.getContactEmail())
+                .contactPhone(order.getContactPhone())
+                .deliveryAddress(order.getDeliveryAddress())
+                .promotionCode(order.getPromotionCode())
+                .paymentMethod(order.getPaymentMethod())
+                .sellerTotal(sellerTotal)
+                .totalSellerItems(totalSellerItems)
+                .sellerOrderItems(sellerOrderItemResponses)
+                .cancellationReason(order.getCancellationReason())
+                .cancelledAt(order.getCancelledAt())
+                .cancelledBy(order.getCancelledBy())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .createdBy(order.getCreatedBy())
+                .updatedBy(order.getUpdatedBy())
+                .customerId(order.getUser().getId())
+                .customerName(customerName)
+                .build();
+    }
+
+    private SellerOrderItemResponse mapToSellerOrderItemResponse(OrderItem orderItem) {
+        Product product = orderItem.getProduct();
+        double totalPrice = orderItem.getPrice() * orderItem.getQuantity();
+
+        return SellerOrderItemResponse.builder()
+                .orderItemId(orderItem.getOrderItemId())
+                .productId(product.getProductId())
+                .productName(product.getName())
+                .productDescription(product.getDescription())
+                .brand(product.getBrand())
+                .storeName(product.getStoreName())
+                .quantity(orderItem.getQuantity())
+                .unitPrice(orderItem.getPrice())
+                .totalPrice(totalPrice)
+                .discountPrice(orderItem.getDiscountPrice())
+                .selectedColor(orderItem.getSelectedColor())
+                .selectedSize(orderItem.getSelectedSize())
+                .stockCode(orderItem.getStockCode())
+                .createdAt(orderItem.getCreatedAt())
+                .updatedAt(orderItem.getUpdatedAt())
+                .build();
+    }
+
+    private Comparator<SellerOrderResponse> getSellerOrderComparator(SellerOrderFilterRequest filterRequest) {
+        Comparator<SellerOrderResponse> comparator;
+
+        switch (filterRequest.getSortBy().toLowerCase()) {
+            case "ordernumber":
+                comparator = Comparator.comparing(SellerOrderResponse::getOrderNumber);
+                break;
+            case "sellertotal":
+                comparator = Comparator.comparing(SellerOrderResponse::getSellerTotal);
+                break;
+            case "customername":
+                comparator = Comparator.comparing(SellerOrderResponse::getCustomerName);
+                break;
+            case "orderstatus":
+                comparator = Comparator.comparing(order -> order.getOrderStatus().name());
+                break;
+            default:
+                comparator = Comparator.comparing(SellerOrderResponse::getCreatedAt);
+        }
+
+        return filterRequest.getSortDirection().equalsIgnoreCase("ASC")
+                ? comparator
+                : comparator.reversed();
     }
 }
 

@@ -2,16 +2,16 @@ package com.example.TTECHT.controller.order;
 
 import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
-import com.example.TTECHT.dto.request.ApiResponse;
-import com.example.TTECHT.dto.request.CancelOrderRequest;
-import com.example.TTECHT.dto.request.OrderCreationRequest;
-import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
+import com.example.TTECHT.dto.repsonse.SellerOrderResponse;
+import com.example.TTECHT.dto.request.*;
 import com.example.TTECHT.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -97,4 +97,21 @@ public class OrderController {
                 .build());
     }
 
+    @GetMapping("/sellers")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<SellerOrderResponse>>> getFilteredSellerOrders(
+            @RequestParam Long sellerId,
+            @ModelAttribute SellerOrderFilterRequest filterRequest,
+            Authentication authentication) {
+
+
+        log.info("Fetching filtered orders for seller ID: {} with filters: {}", sellerId, filterRequest);
+
+        List<SellerOrderResponse> orders = orderService.getOrdersForSeller(sellerId, filterRequest);
+
+        return ResponseEntity.ok(ApiResponse.<List<SellerOrderResponse>>builder()
+                .result(orders)
+                .message("Filtered seller orders retrieved successfully")
+                .build());
+    }
 }
