@@ -55,7 +55,6 @@ public class CartServiceImpl implements CartService {
 
         // save the cart to the database
         cart = cartRepository.save(cart);
-
         return CartResponse.builder()
                 .id(cart.getId())
                 .userId(cart.getUser().getId())
