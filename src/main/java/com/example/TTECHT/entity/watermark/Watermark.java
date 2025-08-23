@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
 @Entity
-@Table(name = "watermark")
+@Table(name = "watermarks")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
