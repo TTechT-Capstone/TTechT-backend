@@ -11,6 +11,13 @@ import com.example.TTECHT.dto.watermark.WatermarkUploadDTO;
 import com.example.TTECHT.dto.watermark.WatermarkUploadResponseDTO;
 import com.example.TTECHT.dto.watermark.WatermarkExtractResponseDTO;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +36,7 @@ import org.springframework.web.client.RestTemplate;
 public class WatermarkService {
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${watermark.service.url:http://localhost:8081/api/images}")
     private String watermarkServiceUrl;
@@ -188,6 +196,8 @@ public class WatermarkService {
      */
     public boolean detectWatermark(String originalWatermark, String extractedWatermark) {
         try {
+            long startMs = System.currentTimeMillis();
+
             // Prepare request using the proper DTO
             WatermarkDetectionDTO request = new WatermarkDetectionDTO(originalWatermark,extractedWatermark);
             
@@ -205,6 +215,7 @@ public class WatermarkService {
                 entity, WatermarkDetectionResponseDTO.class);
             
             WatermarkDetectionResponseDTO responseBody = response.getBody();
+            long elapsedMs = System.currentTimeMillis() - startMs;
             
             if (responseBody != null && responseBody.isSuccess()) {
                 boolean detected = responseBody.isWatermarkDetected();
@@ -222,19 +233,72 @@ public class WatermarkService {
                         metrics != null ? metrics.getPsnr() : 0.0,
                         metrics != null ? metrics.getSsim() : 0.0);
                 }
+                // Persist JSON debug log
+                saveDetectionLog(new HashMap<>() {{
+                    put("success", true);
+                    put("detected", detected);
+                    put("elapsedMs", elapsedMs);
+                    put("message", responseBody.getMessage());
+                    Map<String, Object> requestInfo = new HashMap<>();
+                    requestInfo.put("note", "order = detect(extracted, original) but service signature is (original, extracted)");
+                    requestInfo.put("originalBase64", originalWatermark);
+                    requestInfo.put("extractedBase64", extractedWatermark);
+                    // include pccThreshold in request section for quick visibility
+                    requestInfo.put("pccThreshold", request.getPccThreshold());
+                    put("request", requestInfo);
+                    put("fullResponseBody", responseBody);
+                }});
                 
                 return detected;
             } else {
                 log.warn("Watermark detection service returned unsuccessful response: {}", 
                     responseBody != null ? responseBody.getMessage() : "null");
+                // Persist JSON debug log on unsuccessful
+                saveDetectionLog(new HashMap<>() {{
+                    put("success", false);
+                    put("detected", false);
+                    put("elapsedMs", elapsedMs);
+                    put("message", responseBody != null ? responseBody.getMessage() : "null response");
+                    Map<String, Object> requestInfo = new HashMap<>();
+                    requestInfo.put("originalBase64", originalWatermark);
+                    requestInfo.put("extractedBase64", extractedWatermark);
+                    requestInfo.put("pccThreshold", null);
+                    put("request", requestInfo);
+                    put("fullResponseBody", responseBody);
+                }});
                 return false;
             }
             
         } catch (Exception e) {
             log.error("Failed to call watermark detection service: {}", e.getMessage());
+            // Persist error JSON debug log
+            saveDetectionLog(new HashMap<>() {{
+                put("success", false);
+                put("detected", false);
+                put("error", e.getMessage());
+                Map<String, Object> requestInfo = new HashMap<>();
+                requestInfo.put("originalBase64", originalWatermark);
+                requestInfo.put("extractedBase64", extractedWatermark);
+                requestInfo.put("pccThreshold", null);
+                put("request", requestInfo);
+            }});
             return false; // Return false on error to allow fallback behavior
         }
     }
+
+    private void saveDetectionLog(Map<String, Object> logData) {
+        try {
+            Path dir = Path.of("debug_output");
+            Files.createDirectories(dir);
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path file = dir.resolve(timestamp + "_detect_log.json");
+            byte[] jsonBytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(logData);
+            Files.write(file, jsonBytes);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // Intentionally saving raw base64 as requested; no hashing/truncation helpers.
     
     /**
      * Upload image to Cloudinary and return the response

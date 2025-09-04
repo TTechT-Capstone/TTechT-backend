@@ -18,8 +18,11 @@ public class WatermarkDetectionResponseDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DetectionData {
+        @JsonProperty("comparison_results")
         private ComparisonResults comparisonResults;
+        @JsonProperty("detection_record")
         private Object detectionRecord; // null in your example
+        @JsonProperty("detection_result")
         private DetectionResult detectionResult;
         private Metrics metrics;
     }

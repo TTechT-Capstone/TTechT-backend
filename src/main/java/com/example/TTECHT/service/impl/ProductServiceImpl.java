@@ -869,12 +869,8 @@ public class ProductServiceImpl implements ProductService {
                 extractedWatermark != null ? extractedWatermark.length() : 0);
             
             // Get all watermarks from the database
-            // List<Watermark> allWatermarks = watermarkRepository.findAll();
-            List<Watermark> allWatermarks = java.util.List.of(
-                watermarkRepository.findByStoreName("John's Electronics Store 1")
-                    .orElseThrow(() -> new RuntimeException("Watermark not found for store: John's Electronics Store 1"))
-            );
-            
+             List<Watermark> allWatermarks = watermarkRepository.findAll();
+
             if (allWatermarks.isEmpty()) {
                 log.warn("No watermarks found in database for comparison");
                 return false;

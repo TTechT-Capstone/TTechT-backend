@@ -33,4 +33,9 @@ public class ProductDTO {
     private Boolean isBestSeller;
     private Boolean isNewArrival;
     private LocalDateTime createdAt;
+    
+    // Watermark detection information
+    private Boolean hasWatermarkDetected;
+    private String watermarkDetectionMessage;
+    private List<String> skippedImages; // Images that were skipped due to watermark detection
 }
