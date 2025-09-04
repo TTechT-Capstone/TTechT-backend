@@ -13,9 +13,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class WatermarkExtractDTO {
 
-    @JsonProperty("product_image_base64")
-    private String productImageBase64 = null;
+    @JsonProperty("suspect_image")
+    private String suspect_image = null;
 
-    @JsonProperty("json_image")
-    private JsonNode jsonImage;
+    @JsonProperty("sideinfo_json_path")
+    private JsonNode sideinfo_json_path;
 }

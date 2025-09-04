@@ -11,11 +11,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class WatermarkEmbedDTO {
 
-    @JsonProperty("product_image_base64")
-    private String originalImageBase64 = null;
+    @JsonProperty("original_image")
+    private String original_image = null;
 
-    @JsonProperty("watermark_image_base64")
-    private String watermarkImageBase64 = null;
+    @JsonProperty("watermark_image")
+    private String watermark_image = null;
 
     @JsonProperty("alpha")
     private double alpha = 0.6;

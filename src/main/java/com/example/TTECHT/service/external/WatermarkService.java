@@ -7,8 +7,10 @@ import com.example.TTECHT.dto.watermark.WatermarkRequestDTO;
 import com.example.TTECHT.dto.watermark.WatermarkResponseDTO;
 import com.example.TTECHT.dto.watermark.WatermarkDetectionDTO;
 import com.example.TTECHT.dto.watermark.WatermarkDetectionResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkUploadDTO;
+import com.example.TTECHT.dto.watermark.WatermarkUploadResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkExtractResponseDTO;
 import com.fasterxml.jackson.databind.JsonNode;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +35,10 @@ public class WatermarkService {
 
     @Value("${image.service.url:http://localhost:8081/api/images}") 
     private String imageServiceUrl;
+
+    @Value("${upload.service.url:http://localhost:8081/api/images}")
+    private String uploadServiceUrl;
+
     /**
      * Calls the watermark service to add watermark to an image
      * 
@@ -92,11 +98,11 @@ public class WatermarkService {
      * 
      * @param imageBase64 Base64 encoded image
      * @param jsonImage JSON image
-     * @return String containing the watermark
+     * @return WatermarkExtractResponseDTO containing the extracted watermark data
      * @throws RuntimeException if the image service call fails
      */
 
-    public WatermarkExtractDTO extractWatermark(String imageBase64, JsonNode jsonImage) {
+    public WatermarkExtractResponseDTO extractWatermark(String imageBase64, JsonNode jsonImage) {
         try {
 
             // prepare request
@@ -110,15 +116,18 @@ public class WatermarkService {
             log.info("Calling image service to extract watermark");
 
             // make REST call
-            ResponseEntity<WatermarkExtractDTO> response = restTemplate.exchange(
-                imageServiceUrl + "/extract-watermark",
+            ResponseEntity<WatermarkExtractResponseDTO> response = restTemplate.exchange(
+                imageServiceUrl + "/extract",
                 HttpMethod.POST,
-                entity, WatermarkExtractDTO.class);
+                entity, WatermarkExtractResponseDTO.class);
 
-            WatermarkExtractDTO responseBody = response.getBody();
-            log.info("Image service response - Product image base64: {}, JSON image: {}", 
-                responseBody != null ? responseBody.getProductImageBase64() : "null", 
-                responseBody != null ? responseBody.getJsonImage() : "null");
+            WatermarkExtractResponseDTO responseBody = response.getBody();
+            log.info("Image service response - Success: {}, Status: {}, Extracted watermark length: {}", 
+                responseBody != null ? responseBody.isSuccess() : "null", 
+                responseBody != null ? responseBody.getStatus() : "null",
+                responseBody != null && responseBody.getData() != null ? 
+                    (responseBody.getData().getExtractedWatermark() != null ? 
+                        responseBody.getData().getExtractedWatermark().length() : 0) : 0);
 
             return response.getBody();
         }
@@ -153,7 +162,7 @@ public class WatermarkService {
 
             // make REST call
             ResponseEntity<WatermarkEmbedResponseDTO> response = restTemplate.exchange(
-                imageServiceUrl + "/embed-watermark",
+                imageServiceUrl + "/embed",
                 HttpMethod.POST,
                 entity, WatermarkEmbedResponseDTO.class);
 
@@ -177,10 +186,10 @@ public class WatermarkService {
      * @return boolean indicating if watermark was detected
      * @throws RuntimeException if the image service call fails
      */
-    public boolean detectWatermark(String extractedWatermark, String originalWatermark) {
+    public boolean detectWatermark(String originalWatermark, String extractedWatermark) {
         try {
             // Prepare request using the proper DTO
-            WatermarkDetectionDTO request = new WatermarkDetectionDTO(originalWatermark, extractedWatermark);
+            WatermarkDetectionDTO request = new WatermarkDetectionDTO(originalWatermark,extractedWatermark);
             
             // Prepare request
             HttpHeaders headers = new HttpHeaders();
@@ -191,7 +200,7 @@ public class WatermarkService {
             
             // Make REST call to watermark detection endpoint
             ResponseEntity<WatermarkDetectionResponseDTO> response = restTemplate.exchange(
-                imageServiceUrl + "/detect-watermark",
+                imageServiceUrl + "/detect",
                 HttpMethod.POST,
                 entity, WatermarkDetectionResponseDTO.class);
             
@@ -224,6 +233,52 @@ public class WatermarkService {
         } catch (Exception e) {
             log.error("Failed to call watermark detection service: {}", e.getMessage());
             return false; // Return false on error to allow fallback behavior
+        }
+    }
+    
+    /**
+     * Upload image to Cloudinary and return the response
+     * 
+     * @param imageBase64 Base64 encoded image
+     * @param publicId Optional public ID for the image
+     * @return Cloudinary upload response
+     */
+    public WatermarkUploadResponseDTO uploadToCloudinary(String imageBase64, String publicId) {
+        try {
+            // Prepare request payload for Cloudinary upload
+            WatermarkUploadDTO requestPayload = new WatermarkUploadDTO(imageBase64);
+            
+            // Set headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<WatermarkUploadDTO> entity = new HttpEntity<>(requestPayload, headers);
+            
+            log.info("Uploading image to Cloudinary, public_id: {}", publicId);
+            
+            // Make REST call to Cloudinary upload endpoint
+            ResponseEntity<WatermarkUploadResponseDTO> response = restTemplate.exchange(
+                uploadServiceUrl + "/upload",
+                HttpMethod.POST,
+                entity,
+                WatermarkUploadResponseDTO.class);
+            
+            WatermarkUploadResponseDTO responseBody = response.getBody();
+            
+            if (responseBody != null && responseBody.isSuccess()) {
+                log.info("Image uploaded successfully to Cloudinary, public_id: {}", 
+                    responseBody.getData() != null ? responseBody.getData().getPublicId() : "unknown");
+                return responseBody;
+            } else {
+                log.warn("Cloudinary upload failed: {}", 
+                    responseBody != null ? responseBody.getMessage() : "null response");
+                throw new RuntimeException("Cloudinary upload failed: " + 
+                    (responseBody != null ? responseBody.getMessage() : "unknown error"));
+            }
+            
+        } catch (Exception e) {
+            log.error("Failed to upload image to Cloudinary: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload image to Cloudinary: " + e.getMessage(), e);
         }
     }
 }
