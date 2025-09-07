@@ -2,6 +2,7 @@ package com.example.TTECHT.entity.order;
 
 
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.CancellationReason;
 import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import jakarta.persistence.Entity;
@@ -71,4 +72,14 @@ public class Order {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OrderItem> orderItems;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason")
+    private CancellationReason cancellationReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by", length = 255)
+    private String cancelledBy;
 }

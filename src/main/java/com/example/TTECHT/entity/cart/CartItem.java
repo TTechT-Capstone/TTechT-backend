@@ -31,4 +31,10 @@ public class CartItem {
 
     @Column(name = "quantity", nullable = false)
     Integer quantity;
+
+    @Column(name = "selected_color")
+    String selectedColor;
+
+    @Column(name = "selected_size")
+    String selectedSize;
 }

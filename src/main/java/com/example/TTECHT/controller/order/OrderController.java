@@ -1,14 +1,17 @@
 package com.example.TTECHT.controller.order;
 
+import com.example.TTECHT.dto.repsonse.CancellationReasonResponse;
 import com.example.TTECHT.dto.repsonse.OrderResponse;
-import com.example.TTECHT.dto.request.ApiResponse;
-import com.example.TTECHT.dto.request.OrderCreationRequest;
-import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
+import com.example.TTECHT.dto.repsonse.SellerOrderResponse;
+import com.example.TTECHT.dto.request.*;
 import com.example.TTECHT.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -65,11 +68,13 @@ public class OrderController {
                 .build();
     }
 
-    @PutMapping("/{orderId}/cancel")
-    ApiResponse<Void> cancelOrder(@PathVariable Long orderId) {
-        log.info("Cancel order with ID: {}", orderId);
-        orderService.cancelOrder(orderId);
-        return ApiResponse.<Void>builder().build();
+    @PutMapping("/{userId}/{orderId}/cancel")
+    ApiResponse<String> cancelOrder(@PathVariable Long userId, @PathVariable Long orderId, @RequestBody @Valid CancelOrderRequest request) {
+        log.info("Cancel order with ID: {} with reason: {}", orderId, request.getCancellationReason());
+        orderService.cancelOrder(userId, orderId, request);
+        return ApiResponse.<String>builder()
+                .result("Order cancelled successfully")
+                .build();
     }
 
     @GetMapping("/all")
@@ -78,5 +83,35 @@ public class OrderController {
         return ApiResponse.<List<OrderResponse>>builder()
                 .result(orderService.getAllOrders())
                 .build();
+    }
+
+    @GetMapping("/cancellation-reasons/customer")
+    public ResponseEntity<ApiResponse<List<CancellationReasonResponse>>> getCustomerCancellationReasons() {
+        log.info("Request received to get customer cancellation reasons");
+
+        List<CancellationReasonResponse> reasons = orderService.getCustomerCancellationReasons();
+
+        return ResponseEntity.ok(ApiResponse.<List<CancellationReasonResponse>>builder()
+                .result(reasons)
+                .message("Customer cancellation reasons retrieved successfully")
+                .build());
+    }
+
+    @GetMapping("/sellers")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<SellerOrderResponse>>> getFilteredSellerOrders(
+            @RequestParam Long sellerId,
+            @ModelAttribute SellerOrderFilterRequest filterRequest,
+            Authentication authentication) {
+
+
+        log.info("Fetching filtered orders for seller ID: {} with filters: {}", sellerId, filterRequest);
+
+        List<SellerOrderResponse> orders = orderService.getOrdersForSeller(sellerId, filterRequest);
+
+        return ResponseEntity.ok(ApiResponse.<List<SellerOrderResponse>>builder()
+                .result(orders)
+                .message("Filtered seller orders retrieved successfully")
+                .build());
     }
 }

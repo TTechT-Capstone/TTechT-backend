@@ -4,6 +4,7 @@ package com.example.TTECHT.controller.cart;
 import com.example.TTECHT.dto.repsonse.CartItemResponse;
 import com.example.TTECHT.dto.request.ApiResponse;
 import com.example.TTECHT.dto.request.CartItemRequest;
+import com.example.TTECHT.dto.request.CartItemUpdateRequest;
 import com.example.TTECHT.service.CartItemService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -49,6 +50,17 @@ public class CartItemController {
         cartItemService.updateItemQuantity(cartId,Long.valueOf(itemId), newQuantity);
         return ApiResponse.<String>builder()
                 .result("Item quantity updated successfully")
+                .build();
+    }
+
+    @PutMapping("/{cartId}/{itemId}")
+    ApiResponse<CartItemResponse> updateCartItem(@PathVariable Long cartId, 
+                                                @PathVariable Long itemId, 
+                                                @RequestBody @Valid CartItemUpdateRequest request) {
+        log.info("Updating cart item with ID {} in cart with ID {}", itemId, cartId);
+        CartItemResponse response = cartItemService.updateCartItem(cartId, itemId, request);
+        return ApiResponse.<CartItemResponse>builder()
+                .result(response)
                 .build();
     }
 

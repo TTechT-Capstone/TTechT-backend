@@ -39,6 +39,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     List<Product> findBySeller(User seller);
     
+    @Query("SELECT p FROM Product p WHERE p.seller.id = :sellerId ORDER BY p.createdAt DESC")
+    List<Product> findBySellerIdOrderByCreatedAtDesc(@Param("sellerId") Long sellerId);
+    
     // Best seller queries based on sold quantity
     @Query("SELECT p FROM Product p ORDER BY p.soldQuantity DESC")
     List<Product> findBestSellerProducts(Pageable pageable);

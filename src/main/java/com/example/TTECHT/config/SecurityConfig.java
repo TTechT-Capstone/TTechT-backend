@@ -37,7 +37,7 @@ public class SecurityConfig {
     private final String[] PUBLIC_GET_ENDPOINTS = {
             "/api/v1/roles/all",
             "/api/products", "/api/products/**",
-            "/api/categories", "/api/categories/**"
+            "/api/categories", "/api/categories/**", "/api/v1/orders/cancellation-reasons/customer"
     };
 
     private final CustomJwtDecoder customJwtDecoder;
@@ -110,7 +110,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.setAllowedOrigins(List.of("http://localhost:3000","https://origity.vercel.app", "https://origity.store"));
+        corsConfiguration.setAllowedOrigins(List.of("http://localhost:3000","https://origity.vercel.app", "https://origity.store", "https://www.origity.store"));
+
         corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         corsConfiguration.setAllowedHeaders(List.of("*"));
         corsConfiguration.setAllowCredentials(true);

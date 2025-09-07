@@ -2,6 +2,7 @@ package com.example.TTECHT.dto.repsonse;
 
 
 import java.util.List;
+import com.example.TTECHT.enumuration.CancellationReason;
 import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import lombok.AllArgsConstructor;
@@ -29,4 +30,7 @@ public class OrderResponse {
     private String createdAt;
     private String createdBy;
     private String updatedBy;
+    private CancellationReason cancellationReason;
+    private String cancelledAt;
+    private String cancelledBy;
 }

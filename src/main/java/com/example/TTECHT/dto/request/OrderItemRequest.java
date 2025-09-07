@@ -23,4 +23,6 @@ public class OrderItemRequest {
     private String updatedBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String selectedColor;
+    private String selectedSize;
 }

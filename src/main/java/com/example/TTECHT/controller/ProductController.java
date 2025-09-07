@@ -199,6 +199,24 @@ public class ProductController {
     }
     
     /**
+     * 14. GET /api/products/all - Get all products without pagination
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<ProductDTO>> getAllProductsWithoutPagination() {
+        List<ProductDTO> allProducts = productService.getAllProductsWithoutPagination();
+        return ResponseEntity.ok(allProducts);
+    }
+    
+    /**
+     * 15. GET /api/products/user/{userId} - Get products by user/seller ID
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<ProductDTO>> getProductsByUserId(@PathVariable Long userId) {
+        List<ProductDTO> userProducts = productService.getProductsByUserId(userId);
+        return ResponseEntity.ok(userProducts);
+    }
+    
+    /**
      * Test endpoint for watermark service - For development/testing only
      */
     

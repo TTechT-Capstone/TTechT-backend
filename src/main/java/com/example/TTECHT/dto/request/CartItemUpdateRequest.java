@@ -1,6 +1,5 @@
 package com.example.TTECHT.dto.request;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,10 +9,8 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class CartItemRequest {
-    private String cartId;
-    private Long productId;
-    private int quantity;
+public class CartItemUpdateRequest {
+    private Integer quantity;
     private String color;
     private String size;
 }
