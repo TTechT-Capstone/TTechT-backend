@@ -5,6 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -38,4 +41,14 @@ public class WatermarkDetectionHistory {
 
    @Column(name = "detection_message")
    private String detectionMessage;
+
+   @JdbcTypeCode(SqlTypes.JSON)
+   @Column(name = "watermark_detect_response", columnDefinition = "JSONB")
+   private JsonNode watermarkDetectResponse;
+
+   @Column(name = "detect_status")
+   private String detectStatus;
+
+   @Column(name = "watermark_base64", columnDefinition = "TEXT")
+   private String watermarkBase64;
 }

@@ -285,6 +285,67 @@ public class WatermarkService {
             return false; // Return false on error to allow fallback behavior
         }
     }
+    
+    /**
+     * Calls the image service to detect if a watermark exists in an image and returns full response
+     * 
+     * @param extractedWatermark Base64 encoded extracted watermark
+     * @param originalWatermark Base64 encoded original watermark image to compare against
+     * @return WatermarkDetectionResponseDTO containing full detection response
+     * @throws RuntimeException if the image service call fails
+     */
+    public WatermarkDetectionResponseDTO detectWatermarkWithResponse(String originalWatermark, String extractedWatermark) {
+        try {
+            long startMs = System.currentTimeMillis();
+
+            // Prepare request using the proper DTO
+            WatermarkDetectionDTO request = new WatermarkDetectionDTO(originalWatermark, extractedWatermark);
+            
+            // Prepare request
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<WatermarkDetectionDTO> entity = new HttpEntity<>(request, headers);
+            
+            log.info("Calling image service to detect watermark with full response");
+            
+            // Make REST call to watermark detection endpoint
+            ResponseEntity<WatermarkDetectionResponseDTO> response = restTemplate.exchange(
+                imageServiceUrl + "/detect",
+                HttpMethod.POST,
+                entity, WatermarkDetectionResponseDTO.class);
+            
+            WatermarkDetectionResponseDTO responseBody = response.getBody();
+            long elapsedMs = System.currentTimeMillis() - startMs;
+            
+            if (responseBody != null && responseBody.isSuccess()) {
+                boolean detected = responseBody.isWatermarkDetected();
+                
+                // Log detailed detection results
+                if (responseBody.getData() != null && responseBody.getData().getDetectionResult() != null) {
+                    var detectionResult = responseBody.getData().getDetectionResult();
+                    var metrics = responseBody.getData().getMetrics();
+                    
+                    log.info("Watermark detection completed - Match: {}, PCC: {:.4f}, Threshold: {:.2f}, MSE: {:.4f}, PSNR: {:.2f}, SSIM: {:.4f}", 
+                        detected, 
+                        metrics != null ? metrics.getPcc() : 0.0,
+                        detectionResult.getPccThreshold(),
+                        metrics != null ? metrics.getMse() : 0.0,
+                        metrics != null ? metrics.getPsnr() : 0.0,
+                        metrics != null ? metrics.getSsim() : 0.0);
+                }
+                
+                return responseBody;
+            } else {
+                log.warn("Watermark detection service returned unsuccessful response: {}", 
+                    responseBody != null ? responseBody.getMessage() : "null");
+                return responseBody; // Return the response even if unsuccessful
+            }
+            
+        } catch (Exception e) {
+            log.error("Failed to call watermark detection service: {}", e.getMessage());
+            throw new RuntimeException("Failed to communicate with watermark detection service: " + e.getMessage(), e);
+        }
+    }
 
     private void saveDetectionLog(Map<String, Object> logData) {
         try {

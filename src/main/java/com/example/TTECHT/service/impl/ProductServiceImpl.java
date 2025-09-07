@@ -25,9 +25,13 @@ import com.example.TTECHT.dto.watermark.WatermarkEmbedResponseDTO;
 import com.example.TTECHT.dto.watermark.WatermarkExtractDTO;
 import com.example.TTECHT.dto.watermark.WatermarkExtractResponseDTO;
 import com.example.TTECHT.dto.watermark.WatermarkUploadResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkDetectionResponseDTO;
 import com.example.TTECHT.exception.WatermarkDetectedException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -52,6 +56,17 @@ import java.net.URL;
 import java.io.FileWriter;
 import java.io.File;
 import java.time.format.DateTimeFormatter;
+
+// Helper class to hold watermark detection results
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+class WatermarkDetectionResult {
+    private String watermarkId;
+    private com.fasterxml.jackson.databind.JsonNode detectionResponse;
+    private String detectStatus;
+    private String watermarkBase64;
+}
 
 @Service
 @RequiredArgsConstructor
@@ -699,15 +714,22 @@ public class ProductServiceImpl implements ProductService {
                             imageIndex, existingImage.getImageId());
                         
                         // Check if watermark is detected in the database
-                        String detectedWatermarkId = checkWatermarkInDatabase(extractedWatermark);
+                        WatermarkDetectionResult detectionResult = checkWatermarkInDatabase(extractedWatermark);
                         
-                        if (detectedWatermarkId != null) {
+                        if (detectionResult != null) {
                             // Found matching metadata and detected watermark!
                             log.info("Found matching metadata and detected watermark for image {} using existing image ID {}", 
                                 imageIndex, existingImage.getImageId());
                             
-                            // Collect watermark detection information
-                            watermarkException.addDetectedWatermark(detectedWatermarkId, imageIndex, newImageBase64);
+                            // Collect watermark detection information with full response data
+                            watermarkException.addDetectedWatermark(
+                                detectionResult.getWatermarkId(), 
+                                imageIndex, 
+                                newImageBase64, 
+                                detectionResult.getDetectionResponse(),
+                                detectionResult.getDetectStatus(),
+                                detectionResult.getWatermarkBase64()
+                            );
                             
                             // Skip embedding and save - watermark already exists, no need to process
                             log.info("Skipping image {} - watermark already detected, no embedding needed", imageIndex);
@@ -951,6 +973,9 @@ public class ProductServiceImpl implements ProductService {
                 String watermarkId = e.getDetectedWatermarkIds().get(i);
                 Integer imageIndex = e.getSkippedImageIndexes().get(i);
                 String detectedImageBase64 = i < e.getDetectedImages().size() ? e.getDetectedImages().get(i) : null;
+                JsonNode watermarkDetectResponse = i < e.getWatermarkDetectResponses().size() ? e.getWatermarkDetectResponses().get(i) : null;
+                String detectStatus = i < e.getDetectStatuses().size() ? e.getDetectStatuses().get(i) : null;
+                String watermarkBase64 = i < e.getWatermarkBase64s().size() ? e.getWatermarkBase64s().get(i) : null;
 
                 Long watermarkIdLong = null;
                 try {
@@ -968,6 +993,9 @@ public class ProductServiceImpl implements ProductService {
                     .detectionTimestamp(LocalDateTime.now())
                     .watermarkId(watermarkIdLong)
                     .detectionMessage(String.format("Watermark detected in image %d", imageIndex))
+                    .watermarkDetectResponse(watermarkDetectResponse)
+                    .detectStatus(detectStatus)
+                    .watermarkBase64(watermarkBase64)
                     .build();
 
                 log.info("About to save watermark detection history: productId={}, storeName={}, watermarkId={}, imageIndex={}", 
@@ -992,8 +1020,9 @@ public class ProductServiceImpl implements ProductService {
     /**
      * Check if watermark exists in database by calling watermark detection service
      * Loops through all watermarks in the database and calls detectWatermark API
+     * @return WatermarkDetectionResult containing watermark ID and full response data
      */
-    private String checkWatermarkInDatabase(String extractedWatermark) {
+    private WatermarkDetectionResult checkWatermarkInDatabase(String extractedWatermark) {
         try {
             System.out.println("extracted watermark: " + extractedWatermark);
             log.info("Starting checkWatermarkInDatabase with extracted watermark length: {}", 
@@ -1024,19 +1053,29 @@ public class ProductServiceImpl implements ProductService {
                             watermarkImageBase64 = watermarkImageUrl; // Already base64 or other format
                         }
                         System.out.println("watermark image base64: " + watermarkImageBase64);
-                        // Call the watermark detection service
-                        log.info("Calling detectWatermark for watermark ID: {}, extracted watermark length: {}, original watermark length: {}", 
+                        // Call the watermark detection service with full response
+                        log.info("Calling detectWatermarkWithResponse for watermark ID: {}, extracted watermark length: {}, original watermark length: {}", 
                             watermark.getWatermarkId(), 
                             extractedWatermark != null ? extractedWatermark.length() : 0,
                             watermarkImageBase64 != null ? watermarkImageBase64.length() : 0);
                         
-                        boolean detected = watermarkService.detectWatermark(extractedWatermark, watermarkImageBase64);
+                        WatermarkDetectionResponseDTO detectionResponse = watermarkService.detectWatermarkWithResponse(extractedWatermark, watermarkImageBase64);
+                        boolean detected = detectionResponse != null && detectionResponse.isWatermarkDetected();
                         
                         log.info("Detection result for watermark ID {}: {}", watermark.getWatermarkId(), detected);
                         
                         if (detected) {
                             log.info("Watermark detected! Matches watermark ID: {}", watermark.getWatermarkId());
-                            return watermark.getWatermarkId().toString(); // Return the watermark ID
+                            
+                            // Convert response to JsonNode
+                            JsonNode responseJson = objectMapper.valueToTree(detectionResponse);
+                            
+                            return new WatermarkDetectionResult(
+                                watermark.getWatermarkId().toString(),
+                                responseJson,
+                                "DETECTED",
+                                watermarkImageBase64
+                            );
                         }
                     } else {
                         log.debug("Skipping watermark ID {} - no watermark image available", watermark.getWatermarkId());
