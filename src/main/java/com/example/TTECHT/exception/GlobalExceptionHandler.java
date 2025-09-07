@@ -1,7 +1,6 @@
 package com.example.TTECHT.exception;
 
 import com.example.TTECHT.dto.request.ApiResponse;
-import com.example.TTECHT.entity.token.InvalidatedToken;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -31,6 +30,11 @@ public class GlobalExceptionHandler {
     
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        // Check if this is a watermark detection error
+        if (ex.getMessage() != null && ex.getMessage().startsWith("WATERMARK_DETECTED:")) {
+            return handleWatermarkDetectionError(ex);
+        }
+        
         Map<String, Object> error = new HashMap<>();
         error.put("timestamp", LocalDateTime.now());
         error.put("status", HttpStatus.BAD_REQUEST.value());
@@ -38,6 +42,17 @@ public class GlobalExceptionHandler {
         error.put("message", ex.getMessage());
         
         return ResponseEntity.badRequest().body(error);
+    }
+    
+    private ResponseEntity<Map<String, Object>> handleWatermarkDetectionError(RuntimeException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.CONFLICT.value());
+        error.put("error", "Watermark Detected");
+        error.put("errorCode", "WATERMARK_DETECTED");
+        error.put("message", ex.getMessage().replace("WATERMARK_DETECTED: ", ""));
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
     
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -10,13 +10,28 @@ import com.example.TTECHT.entity.ProductSize;
 import com.example.TTECHT.entity.user.User;
 import com.example.TTECHT.repository.ProductColorRepository;
 import com.example.TTECHT.repository.ProductImageRepository;
+import com.example.TTECHT.repository.user.SellerRepository;
 import com.example.TTECHT.repository.ProductRepository;
 import com.example.TTECHT.repository.ProductSizeRepository;
+import com.example.TTECHT.repository.watermark.WatermarkRepository;
+import com.example.TTECHT.repository.watermark.WatermarkDetectionHistoryRepository;
+import com.example.TTECHT.entity.watermark.Watermark;
+import com.example.TTECHT.entity.watermark.WatermarkDetectionHistory;
 import com.example.TTECHT.repository.user.UserRepository;
 import com.example.TTECHT.service.CategoryService;
 import com.example.TTECHT.service.ProductService;
 import com.example.TTECHT.service.external.WatermarkService;
-import com.example.TTECHT.dto.watermark.WatermarkResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkEmbedResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkExtractDTO;
+import com.example.TTECHT.dto.watermark.WatermarkExtractResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkUploadResponseDTO;
+import com.example.TTECHT.dto.watermark.WatermarkDetectionResponseDTO;
+import com.example.TTECHT.exception.WatermarkDetectedException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +39,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,6 +49,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Base64;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.io.FileWriter;
+import java.io.File;
+import java.time.format.DateTimeFormatter;
+
+// Helper class to hold watermark detection results
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+class WatermarkDetectionResult {
+    private String watermarkId;
+    private com.fasterxml.jackson.databind.JsonNode detectionResponse;
+    private String detectStatus;
+    private String watermarkBase64;
+}
 
 @Service
 @RequiredArgsConstructor
@@ -42,9 +78,14 @@ public class ProductServiceImpl implements ProductService {
     private final ProductColorRepository productColorRepository;
     private final ProductSizeRepository productSizeRepository;
     private final ProductImageRepository productImageRepository;
+    private final WatermarkRepository watermarkRepository;
+    private final WatermarkDetectionHistoryRepository watermarkDetectionHistoryRepository;
     private final CategoryService categoryService;
     private final UserRepository userRepository;
     private final WatermarkService watermarkService;
+    private final SellerRepository sellerRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional(readOnly = true)
@@ -121,7 +162,25 @@ public class ProductServiceImpl implements ProductService {
         
         // Process images if provided (max 4 images)
         if (productCreateDTO.getImages() != null && !productCreateDTO.getImages().isEmpty()) {
-            processProductImages(savedProduct, productCreateDTO.getImages(), productCreateDTO.getStoreName());
+            try {
+                processProductImages(savedProduct, productCreateDTO.getImages(), productCreateDTO.getStoreName());
+            } catch (WatermarkDetectedException e) {
+                // Watermarks were detected - save to history and throw error response
+                log.info("WatermarkDetectedException caught for product {} with {} detections", 
+                    savedProduct.getProductId(), e.getDetectedWatermarkIds().size());
+                
+                // Save history immediately with explicit commit
+                try {
+                    // Test if we can save a simple record first
+                    testWatermarkHistorySave(savedProduct.getProductId(), e.getStoreName());
+                    saveWatermarkDetectionHistoryDirect(savedProduct, e);
+                    log.info("Watermark detection history saved successfully for product {}", savedProduct.getProductId());
+                } catch (Exception historyEx) {
+                    log.error("Failed to save watermark detection history: {}", historyEx.getMessage(), historyEx);
+                }
+                
+                throw new RuntimeException("WATERMARK_DETECTED: " + e.getDetectionSummary());
+            }
         }
 
         return convertToDTO(savedProduct);
@@ -485,8 +544,13 @@ public class ProductServiceImpl implements ProductService {
      * @param imageBase64List List of base64 encoded images (max 4)
      * @param storeName Store name for watermarking
      */
-    private void processProductImages(Product product, List<String> imageBase64List, String storeName) {
+    
+    public void processProductImages(Product product, List<String> imageBase64List, String storeName) {
+        log.info("Starting processProductImages for product {} with store {}", product.getProductId(), storeName);
+        WatermarkDetectedException watermarkException = new WatermarkDetectedException(
+            "Watermark detection occurred during image processing", storeName);
         if (imageBase64List == null || imageBase64List.isEmpty()) {
+            log.info("No images to process for product {}", product.getProductId());
             return;
         }
         
@@ -495,39 +559,591 @@ public class ProductServiceImpl implements ProductService {
             throw new RuntimeException("Maximum 4 images allowed per product");
         }
         
+        try {
+            log.info("Starting image processing for store: {} with product ID: {}", storeName, product.getProductId());
+            
+            System.out.println("this is store name: " + storeName);
+            // check if the store exists
+            sellerRepository.findByStoreName(storeName).orElseThrow(() -> new RuntimeException("Store does not exist"));
+
+            // Get watermark image for this store
+            String watermarkImageUrl = watermarkRepository.findByStoreName(storeName)
+                    .orElseThrow(() -> new RuntimeException("Watermark not found for store: " + storeName))
+                    .getWatermarkUrlImage();
+            
+            // Convert URL to base64 if it's a URL, otherwise use as-is
+            String watermarkImageBase64;
+            if (watermarkImageUrl != null && (watermarkImageUrl.startsWith("http") || watermarkImageUrl.startsWith("@http"))) {
+                watermarkImageBase64 = convertUrlToBase64(watermarkImageUrl);
+            } else {
+                watermarkImageBase64 = watermarkImageUrl; // Already base64 or other format
+            }
+
+            log.info("Successfully retrieved watermark for store: {}, length: {}", storeName, 
+                watermarkImageBase64 != null ? watermarkImageBase64.length() : 0);
+            
+                        // Process each image individually to maintain unique jsonImage for each
         for (int i = 0; i < imageBase64List.size(); i++) {
             String imageBase64 = imageBase64List.get(i);
             
+                log.info("Processing image {} of {}, length: {}", i + 1, imageBase64List.size(), 
+                    imageBase64 != null ? imageBase64.length() : 0);
+            
             if (imageBase64 == null || imageBase64.trim().isEmpty()) {
+                    log.warn("Skipping empty image {}", i + 1);
                 continue; // Skip empty images
             }
             
             try {
-                // Call watermark service for each image
-//                WatermarkResponseDTO watermarkResponse = watermarkService.addWatermark(imageBase64, storeName);
-                WatermarkResponseDTO watermarkResponse = watermarkService.addWatermark(imageBase64, storeName);
-                if (watermarkResponse.isSuccess() && watermarkResponse.getImageUrl() != null) {
-                    // Save the image URL to database
-                    ProductImage productImage = new ProductImage();
-                    productImage.setProduct(product);
-                    productImage.setUrlImage(watermarkResponse.getImageUrl());
-                    productImageRepository.save(productImage);
+                                            // Check if we have any existing product images to compare against
+                        List<ProductImage> existingImages = productImageRepository.findByProductProductIdNot(product.getProductId());
+                        log.info("Found {} existing images in database (excluding current product)", existingImages.size());
                     
-                    log.info("Successfully processed image {} for product {}", i + 1, product.getProductId());
+                                                if (existingImages.isEmpty()) {
+                            // CASE 1: No existing images in database - proceed with direct embedding
+                            log.info("No existing images in database, proceeding with direct watermark embedding for image {}", i + 1);
+                            processNewImageWithEmbedding(product, imageBase64, watermarkImageBase64, i + 1);
+                        } else {
+                        // Filter out images that have valid jsonImage metadata
+                        List<ProductImage> imagesWithMetadata = existingImages.stream()
+                            .filter(img -> img.getJsonImage() != null && !img.getJsonImage().isNull())
+                            .collect(Collectors.toList());
+                        
+                        log.info("Found {} images with valid metadata out of {} total images", 
+                            imagesWithMetadata.size(), existingImages.size());
+                        
+                        if (imagesWithMetadata.isEmpty()) {
+                            // CASE 1b: Images exist but all have empty/null jsonImage - treat as cold start
+                            log.info("Found {} existing images but all have empty jsonImage metadata, treating as cold start for image {}", 
+                                existingImages.size(), i + 1);
+                            processNewImageWithEmbedding(product, imageBase64, watermarkImageBase64, i + 1);
                 } else {
-                    log.warn("Watermark service failed for image {} of product {}: {}", 
-                        i + 1, product.getProductId(), watermarkResponse.getMessage());
-                    throw new RuntimeException("Failed to process image " + (i + 1) + ": " + watermarkResponse.getMessage());
+                            // CASE 2: Existing images with metadata found - try to find matching metadata
+                            log.info("Found {} images with valid metadata, attempting to find match for image {}", 
+                                imagesWithMetadata.size(), i + 1);
+                            
+                            boolean matchFound = findAndProcessWithMatchingMetadata(product, imageBase64, watermarkImageBase64, imagesWithMetadata, i + 1, watermarkException);
+                            
+                            if (!matchFound) {
+                                // No matching metadata found, treat as new image type
+                                log.info("No matching metadata found among {} valid metadata entries for image {}, proceeding with new watermark embedding", 
+                                    imagesWithMetadata.size(), i + 1);
+                                processNewImageWithEmbedding(product, imageBase64, watermarkImageBase64, i + 1);
+                            }
+                        }
                 }
                 
             } catch (Exception e) {
                 log.error("Error processing image {} for product {}", i + 1, product.getProductId(), e);
-                throw new RuntimeException("Failed to process image " + (i + 1) + ": " + e.getMessage(), e);
+                    throw new RuntimeException("Failed to process image " + (i + 1) + ": " + e.getMessage());
+                }
             }
-        }
-        
-        log.info("Successfully processed {} images for product {}", imageBase64List.size(), product.getProductId());
+            
+            log.info("Successfully processed {} images for product {}", imageBase64List.size(), product.getProductId());
+            
+            // Check if any watermarks were detected and throw exception if so
+            if (watermarkException.hasDetections()) {
+                throw watermarkException;
+            }
+            
+        } catch (WatermarkDetectedException e) {
+            // Re-throw watermark detection exception
+            throw e;
+        } catch (Exception e) {
+            log.error("Error getting watermark for store: {}", storeName, e);
+            throw new RuntimeException("Failed to get watermark for store: " + storeName, e);
+                }
     }
+    
+    /**
+     * Process new image with watermark embedding (for cold start scenarios)
+     */
+    private void processNewImageWithEmbedding(Product product, String imageBase64, String watermarkImageBase64, int imageIndex) {
+        try {
+            log.info("Starting watermark embedding for image {} with watermark length: {}", 
+                imageIndex, watermarkImageBase64 != null ? watermarkImageBase64.length() : 0);
+            
+            WatermarkEmbedResponseDTO watermarkResponse = watermarkService.embedWatermark(
+                imageBase64, watermarkImageBase64, 0.6);
+            
+            log.info("Watermark embedding completed for image {}, response success: {}", 
+                imageIndex, watermarkResponse != null ? watermarkResponse.isSuccess() : "null");
+            
+            saveWatermarkedImage(product, watermarkResponse, imageIndex);
+        } catch (Exception e) {
+            log.error("Error in embedding watermark for new image {}: {}", imageIndex, e.getMessage(), e);
+            throw new RuntimeException("Failed to embed watermark for image " + imageIndex + ": " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Save watermarked image to database
+     */
+    private void saveWatermarkedImage(Product product, WatermarkEmbedResponseDTO watermarkResponse, int imageIndex) {
+        if (watermarkResponse.isSuccess() && watermarkResponse.getData() != null) {
+            ProductImage productImage = new ProductImage();
+            productImage.setProduct(product); // Product is already managed
+            
+            // Extract the watermarked image base64 from the response data
+            String watermarkedImageBase64 = null;
+            if (watermarkResponse.getData().has("watermarked_image")) {
+                watermarkedImageBase64 = watermarkResponse.getData().get("watermarked_image").asText();
+            } else {
+                throw new RuntimeException("No watermarked_image found in response for image " + imageIndex);
+            }
+            
+            // Call upload to cloudinary with the watermarked image
+            WatermarkUploadResponseDTO uploadResponse = watermarkService.uploadToCloudinary(watermarkedImageBase64, "product_image_" + product.getProductId() + "_" + imageIndex);
+            if (uploadResponse.isSuccess() && uploadResponse.getData() != null) {
+                productImage.setUrlImage(uploadResponse.getData().getUrl());
+            } else {
+                throw new RuntimeException("Failed to upload image to Cloudinary for image " + imageIndex);
+            }
+            
+            // Save only the metadata part of the watermark response - this contains the essential watermarking info
+            JsonNode metadataNode = watermarkResponse.getData().get("metadata");
+            if (metadataNode != null) {
+                productImage.setJsonImage(metadataNode);
+            } else {
+                throw new RuntimeException("No metadata found in watermark response for image " + imageIndex);
+            }
+            
+            productImageRepository.save(productImage);
+            log.info("Successfully processed and watermarked image {} for product {}", imageIndex, product.getProductId());
+        } else {
+            log.warn("Watermark service failed for image {}: {}", imageIndex, watermarkResponse.getMessage());
+            throw new RuntimeException("Failed to process image " + imageIndex + ": " + watermarkResponse.getMessage());
+        }
+    }
+    
+    /**
+     * Find matching metadata and process image with extraction + watermark detection
+     * This solves Problem 2: When we have existing images, we need to find the right metadata
+     */
+    private boolean findAndProcessWithMatchingMetadata(Product product, String newImageBase64, 
+                                                     String watermarkImageBase64, List<ProductImage> existingImages, 
+                                                     int imageIndex, WatermarkDetectedException watermarkException) {
+        try {
+            // Strategy: Try to extract watermark from the new image using metadata from existing images
+            // If extraction succeeds and matches a known watermark, we found the right metadata
+            
+            for (ProductImage existingImage : existingImages) {
+                if (existingImage.getJsonImage() == null) {
+                    continue; // Skip images without metadata
+                }
+                
+                try {
+
+                    System.out.println("this is watermark image base64: " + watermarkImageBase64);
+                    System.out.println("this is new image base64: " + newImageBase64);
+                    System.out.println("this is existing image json: " + existingImage.getJsonImage());
+                    
+                    // Try to extract watermark using this existing image's metadata
+                    WatermarkExtractResponseDTO extractResponse = watermarkService.extractWatermark(
+                        newImageBase64, existingImage.getJsonImage());
+
+                    System.out.println("den day r nha");
+                    
+                    if (extractResponse != null && extractResponse.isSuccess() && 
+                        extractResponse.getData() != null && 
+                        extractResponse.getData().getExtractedWatermark() != null) {
+                        // Extraction successful - check if this watermark exists in our database
+                        String extractedWatermark = extractResponse.getData().getExtractedWatermark(); // This would be the extracted watermark
+
+                        // Save extract response and extracted watermark to separate JSON files for debugging
+                        try {
+                            saveToJsonFile(extractResponse, "extract_response.json", "Extract Response");
+                            saveToJsonFile(extractedWatermark, "extracted_watermark.txt", "Extracted Watermark");
+                        } catch (Exception debugEx) {
+                            log.warn("Failed to save debug files: {}", debugEx.getMessage());
+                        }
+                        
+                        log.info("Extraction successful for image {} using metadata from image ID {}", 
+                            imageIndex, existingImage.getImageId());
+                        
+                        // Check if watermark is detected in the database
+                        WatermarkDetectionResult detectionResult = checkWatermarkInDatabase(extractedWatermark);
+                        
+                        if (detectionResult != null) {
+                            // Found matching metadata and detected watermark!
+                            log.info("Found matching metadata and detected watermark for image {} using existing image ID {}", 
+                                imageIndex, existingImage.getImageId());
+                            
+                            // Collect watermark detection information with full response data
+                            watermarkException.addDetectedWatermark(
+                                detectionResult.getWatermarkId(), 
+                                imageIndex, 
+                                newImageBase64, 
+                                detectionResult.getDetectionResponse(),
+                                detectionResult.getDetectStatus(),
+                                detectionResult.getWatermarkBase64()
+                            );
+                            
+                            // Skip embedding and save - watermark already exists, no need to process
+                            log.info("Skipping image {} - watermark already detected, no embedding needed", imageIndex);
+                            return true; // Match found, skip processing
+                        } else {
+                            // No watermark detected - proceed with embedding and save
+                            log.info("No watermark detected for image {} using metadata from image ID {}, proceeding with embedding", 
+                                imageIndex, existingImage.getImageId());
+                            
+                            // Process with embedding using the existing metadata
+                            processImageWithEmbeddingAndExistingMetadata(product, newImageBase64, watermarkImageBase64, existingImage.getJsonImage(), imageIndex);
+                            return true; // Processed successfully
+                        }
+                    }
+                } catch (Exception e) {
+                    // Extraction failed with this metadata, try next one
+                    log.debug("Extraction failed with metadata from image {}: {}", existingImage.getImageId(), e.getMessage());
+                    continue;
+                }
+            }
+            
+            return false; // No matching metadata found
+        } catch (Exception e) {
+            log.error("Error in finding matching metadata for image {}: {}", imageIndex, e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Save image with existing metadata when a match is found
+     */
+    private void saveImageWithExistingMetadata(Product product, String imageBase64, JsonNode existingMetadata, int imageIndex) {
+        ProductImage productImage = new ProductImage();
+        productImage.setProduct(product); // Product is already managed
+        productImage.setUrlImage(imageBase64); // Store the original image
+        productImage.setJsonImage(existingMetadata); // Reuse the existing metadata
+        
+        productImageRepository.save(productImage);
+        log.info("Saved image {} with existing metadata for product {}", imageIndex, product.getProductId());
+    }
+    
+    /**
+     * Process image with embedding when no watermark is detected but we have existing metadata
+     * This will embed a new watermark and save the result
+     */
+    private void processImageWithEmbeddingAndExistingMetadata(Product product, String imageBase64, String watermarkImageBase64, JsonNode existingMetadata, int imageIndex) {
+        try {
+            log.info("Starting watermark embedding for image {} (no watermark detected, using existing metadata)", imageIndex);
+            
+            // Embed watermark using the existing metadata as reference
+            WatermarkEmbedResponseDTO watermarkResponse = watermarkService.embedWatermark(
+                imageBase64, watermarkImageBase64, 0.6);
+            
+            log.info("Watermark embedding completed for image {}, response success: {}", 
+                imageIndex, watermarkResponse != null ? watermarkResponse.isSuccess() : "null");
+            
+            if (watermarkResponse != null && watermarkResponse.isSuccess() && watermarkResponse.getData() != null) {
+                ProductImage productImage = new ProductImage();
+                productImage.setProduct(product); // Product is already managed
+                
+                // Extract the watermarked image base64 from the response data
+                String watermarkedImageBase64 = null;
+                if (watermarkResponse.getData().has("watermarked_image")) {
+                    watermarkedImageBase64 = watermarkResponse.getData().get("watermarked_image").asText();
+                } else {
+                    throw new RuntimeException("No watermarked_image found in response for image " + imageIndex);
+                }
+                
+                // Call upload to cloudinary with the watermarked image
+                WatermarkUploadResponseDTO uploadResponse = watermarkService.uploadToCloudinary(watermarkedImageBase64, "product_image_" + product.getProductId() + "_" + imageIndex);
+                if (uploadResponse.isSuccess() && uploadResponse.getData() != null) {
+                    productImage.setUrlImage(uploadResponse.getData().getUrl());
+                } else {
+                    throw new RuntimeException("Failed to upload image to Cloudinary for image " + imageIndex);
+                }
+                
+                // Save the new metadata from the embedding process
+                JsonNode newMetadataNode = watermarkResponse.getData().get("metadata");
+                if (newMetadataNode != null) {
+                    productImage.setJsonImage(newMetadataNode);
+                } else {
+                    throw new RuntimeException("No metadata found in watermark response for image " + imageIndex);
+                }
+                
+                productImageRepository.save(productImage);
+                log.info("Successfully processed and watermarked image {} for product {} (no existing watermark detected)", imageIndex, product.getProductId());
+            } else {
+                log.warn("Watermark service failed for image {}: {}", imageIndex, watermarkResponse.getMessage());
+                throw new RuntimeException("Failed to process image " + imageIndex + ": " + watermarkResponse.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Error in embedding watermark for image {} (no watermark detected): {}", imageIndex, e.getMessage(), e);
+            throw new RuntimeException("Failed to embed watermark for image " + imageIndex + ": " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper method to convert image URL to base64 format
+     * @param imageUrl The URL of the image (e.g., Cloudinary URL)
+     * @return Base64 encoded string of the image
+     * @throws RuntimeException if the image cannot be downloaded or converted
+     */
+    public String convertUrlToBase64(String imageUrl) {
+        try {
+            log.info("Converting image URL to base64: {}", imageUrl);
+            
+            // Remove any leading/trailing whitespace and @ symbol if present
+            String cleanUrl = imageUrl.trim();
+            if (cleanUrl.startsWith("@")) {
+                cleanUrl = cleanUrl.substring(1);
+            }
+            
+            // Download the image from URL
+            URL url = new URL(cleanUrl);
+            try (InputStream inputStream = url.openStream()) {
+                byte[] imageBytes = inputStream.readAllBytes();
+                
+                // Convert to base64
+                String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+                
+                // Determine the image format from URL extension
+                String imageFormat = "png"; // default
+                if (cleanUrl.toLowerCase().contains(".jpg") || cleanUrl.toLowerCase().contains(".jpeg")) {
+                    imageFormat = "jpeg";
+                } else if (cleanUrl.toLowerCase().contains(".png")) {
+                    imageFormat = "png";
+                } else if (cleanUrl.toLowerCase().contains(".gif")) {
+                    imageFormat = "gif";
+                } else if (cleanUrl.toLowerCase().contains(".webp")) {
+                    imageFormat = "webp";
+                }
+                
+                // Add data URL prefix
+                String dataUrl = "data:image/" + imageFormat + ";base64," + base64Image;
+                
+                log.info("Successfully converted image URL to base64, original length: {}, base64 length: {}", 
+                    imageBytes.length, dataUrl.length());
+                
+                return dataUrl;
+            }
+            
+        } catch (IOException e) {
+            log.error("Failed to download and convert image from URL: {}", imageUrl, e);
+            throw new RuntimeException("Failed to convert image URL to base64: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Unexpected error converting image URL to base64: {}", imageUrl, e);
+            throw new RuntimeException("Failed to process image URL: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Utility method to save data to JSON files for debugging
+     * @param data The data to save
+     * @param filename The filename to save to
+     * @param description Description of what the data represents
+     */
+    private void saveToJsonFile(Object data, String filename, String description) {
+        try {
+            // Create debug directory if it doesn't exist
+            String debugDir = "debug_output";
+            File directory = new File(debugDir);
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+            
+            // Generate timestamp for unique filenames
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String fullFilename = debugDir + File.separator + timestamp + "_" + filename;
+            
+            // Convert data to JSON string
+            String jsonContent;
+            if (data instanceof String) {
+                jsonContent = data.toString();
+            } else {
+                jsonContent = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(data);
+            }
+            
+            // Write to file
+            try (FileWriter writer = new FileWriter(fullFilename)) {
+                writer.write(jsonContent);
+            }
+            
+            log.info("Saved {} to file: {}", description, fullFilename);
+            
+        } catch (Exception e) {
+            log.error("Failed to save {} to file: {}", description, e.getMessage());
+        }
+    }
+    
+    /**
+     * Save watermark detection history to database
+     */
+
+    public void testWatermarkHistorySave(Long productId, String storeName) {
+        try {
+            log.info("Testing watermark history save for product {} store {}", productId, storeName);
+            
+            WatermarkDetectionHistory testHistory = WatermarkDetectionHistory.builder()
+                .productId(productId)
+                .storeName(storeName)
+                .detectedImageBase64(null)
+                .detectionTimestamp(LocalDateTime.now())
+                .watermarkId(999L)
+                .detectionMessage("TEST RECORD")
+                .build();
+
+            WatermarkDetectionHistory saved = watermarkDetectionHistoryRepository.save(testHistory);
+            log.info("TEST: Successfully saved watermark detection history with ID {}", saved.getDetectionId());
+            
+            // Verify it was saved
+            long count = watermarkDetectionHistoryRepository.count();
+            log.info("TEST: Total watermark detection history count after test save: {}", count);
+            
+        } catch (Exception e) {
+            log.error("TEST: Failed to save test watermark detection history: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    public void saveWatermarkDetectionHistoryDirect(Product product, WatermarkDetectedException e) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
+        
+        transactionTemplate.execute(status -> {
+            saveWatermarkDetectionHistory(product, e);
+            return null;
+        });
+    }
+    
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    private void saveWatermarkDetectionHistory(Product product, WatermarkDetectedException e) {
+        try {
+            log.info("Starting to save watermark detection history for product {} with {} detections", 
+                product.getProductId(), e.getDetectedWatermarkIds().size());
+            
+            // Test repository connection first
+            long countBefore = watermarkDetectionHistoryRepository.count();
+            log.info("Current watermark detection history count before save: {}", countBefore);
+            
+            for (int i = 0; i < e.getDetectedWatermarkIds().size(); i++) {
+                String watermarkId = e.getDetectedWatermarkIds().get(i);
+                Integer imageIndex = e.getSkippedImageIndexes().get(i);
+                String detectedImageBase64 = i < e.getDetectedImages().size() ? e.getDetectedImages().get(i) : null;
+                JsonNode watermarkDetectResponse = i < e.getWatermarkDetectResponses().size() ? e.getWatermarkDetectResponses().get(i) : null;
+                String detectStatus = i < e.getDetectStatuses().size() ? e.getDetectStatuses().get(i) : null;
+                String watermarkBase64 = i < e.getWatermarkBase64s().size() ? e.getWatermarkBase64s().get(i) : null;
+
+                Long watermarkIdLong = null;
+                try {
+                    if (watermarkId != null && !watermarkId.equals("Unknown")) {
+                        watermarkIdLong = Long.parseLong(watermarkId);
+                    }
+                } catch (NumberFormatException nfe) {
+                    log.warn("Invalid watermark ID format: {}", watermarkId);
+                }
+
+                WatermarkDetectionHistory history = WatermarkDetectionHistory.builder()
+                    .productId(product.getProductId())
+                    .storeName(e.getStoreName())
+                    .detectedImageBase64(detectedImageBase64) 
+                    .detectionTimestamp(LocalDateTime.now())
+                    .watermarkId(watermarkIdLong)
+                    .detectionMessage(String.format("Watermark detected in image %d", imageIndex))
+                    .watermarkDetectResponse(watermarkDetectResponse)
+                    .detectStatus(detectStatus)
+                    .watermarkBase64(watermarkBase64)
+                    .build();
+
+                log.info("About to save watermark detection history: productId={}, storeName={}, watermarkId={}, imageIndex={}", 
+                    history.getProductId(), history.getStoreName(), history.getWatermarkId(), imageIndex);
+
+                WatermarkDetectionHistory savedHistory = watermarkDetectionHistoryRepository.save(history);
+                log.info("Successfully saved watermark detection history with ID {} for product {} image {}", 
+                    savedHistory.getDetectionId(), product.getProductId(), imageIndex);
+            }
+            
+            // Verify the save worked
+            long countAfter = watermarkDetectionHistoryRepository.count();
+            log.info("Watermark detection history count after save: {} (added {})", countAfter, countAfter - countBefore);
+            
+            log.info("Completed saving all watermark detection history for product {}", product.getProductId());
+        } catch (Exception ex) {
+            log.error("Failed to save watermark detection history: {}", ex.getMessage(), ex);
+            // Don't throw exception here to avoid masking the original watermark detection
+        }
+    }
+    
+    /**
+     * Check if watermark exists in database by calling watermark detection service
+     * Loops through all watermarks in the database and calls detectWatermark API
+     * @return WatermarkDetectionResult containing watermark ID and full response data
+     */
+    private WatermarkDetectionResult checkWatermarkInDatabase(String extractedWatermark) {
+        try {
+            System.out.println("extracted watermark: " + extractedWatermark);
+            log.info("Starting checkWatermarkInDatabase with extracted watermark length: {}", 
+                extractedWatermark != null ? extractedWatermark.length() : 0);
+            
+            // Get all watermarks from the database
+            List<Watermark> allWatermarks = watermarkRepository.findAll();
+
+            if (allWatermarks.isEmpty()) {
+                log.warn("No watermarks found in database for comparison");
+                return null;
+            }
+            
+            log.info("Checking extracted watermark against {} watermarks in database", allWatermarks.size());
+            
+            // Loop through each watermark and call the detection service
+            for (Watermark watermark : allWatermarks) {
+                try {
+                    // Get the watermark image for comparison
+                    String watermarkImageUrl = watermark.getWatermarkUrlImage();
+                    
+                    if (watermarkImageUrl != null && !watermarkImageUrl.trim().isEmpty()) {
+                        // Convert URL to base64 if it's a URL, otherwise use as-is
+                        String watermarkImageBase64;
+                        if (watermarkImageUrl.startsWith("http") || watermarkImageUrl.startsWith("@http")) {
+                            watermarkImageBase64 = convertUrlToBase64(watermarkImageUrl);
+                        } else {
+                            watermarkImageBase64 = watermarkImageUrl; // Already base64 or other format
+                        }
+                        System.out.println("watermark image base64: " + watermarkImageBase64);
+                        // Call the watermark detection service with full response
+                        log.info("Calling detectWatermarkWithResponse for watermark ID: {}, extracted watermark length: {}, original watermark length: {}", 
+                            watermark.getWatermarkId(), 
+                            extractedWatermark != null ? extractedWatermark.length() : 0,
+                            watermarkImageBase64 != null ? watermarkImageBase64.length() : 0);
+                        
+                        WatermarkDetectionResponseDTO detectionResponse = watermarkService.detectWatermarkWithResponse(extractedWatermark, watermarkImageBase64);
+                        boolean detected = detectionResponse != null && detectionResponse.isWatermarkDetected();
+                        
+                        log.info("Detection result for watermark ID {}: {}", watermark.getWatermarkId(), detected);
+                        
+                        if (detected) {
+                            log.info("Watermark detected! Matches watermark ID: {}", watermark.getWatermarkId());
+                            
+                            // Convert response to JsonNode
+                            JsonNode responseJson = objectMapper.valueToTree(detectionResponse);
+                            
+                            return new WatermarkDetectionResult(
+                                watermark.getWatermarkId().toString(),
+                                responseJson,
+                                "DETECTED",
+                                watermarkImageBase64
+                            );
+                        }
+                    } else {
+                        log.debug("Skipping watermark ID {} - no watermark image available", watermark.getWatermarkId());
+                    }
+                } catch (Exception e) {
+                    log.warn("Error checking watermark ID {}: {}", watermark.getWatermarkId(), e.getMessage());
+                    // Continue with next watermark instead of failing completely
+                    continue;
+                }
+            }
+            
+            log.debug("No matching watermark found after checking all {} watermarks", allWatermarks.size());
+            return null; // No matches found
+            
+        } catch (Exception e) {
+            log.error("Error in watermark database check: {}", e.getMessage());
+            return null; // Return null on error to allow fallback behavior
+        }
+    }
+ 
     
     /**
      * Bulk load colors for multiple products to avoid N+1 queries
@@ -597,3 +1213,4 @@ public class ProductServiceImpl implements ProductService {
         return dto;
     }
 }
+
