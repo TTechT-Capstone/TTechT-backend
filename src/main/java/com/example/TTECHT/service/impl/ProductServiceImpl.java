@@ -776,7 +776,8 @@ public class ProductServiceImpl implements ProductService {
                                 newImageBase64, 
                                 detectionResult.getDetectionResponse(),
                                 detectionResult.getDetectStatus(),
-                                detectionResult.getWatermarkBase64()
+                                detectionResult.getWatermarkBase64(),
+                                extractedWatermark
                             );
                             
                             // Skip embedding and save - watermark already exists, no need to process
@@ -1024,6 +1025,7 @@ public class ProductServiceImpl implements ProductService {
                 JsonNode watermarkDetectResponse = i < e.getWatermarkDetectResponses().size() ? e.getWatermarkDetectResponses().get(i) : null;
                 String detectStatus = i < e.getDetectStatuses().size() ? e.getDetectStatuses().get(i) : null;
                 String watermarkBase64 = i < e.getWatermarkBase64s().size() ? e.getWatermarkBase64s().get(i) : null;
+                String extractedWatermarkBase64 = (e.getExtractedWatermarkBase64s() != null && i < e.getExtractedWatermarkBase64s().size()) ? e.getExtractedWatermarkBase64s().get(i) : null;
 
                 Long watermarkIdLong = null;
                 try {
@@ -1044,6 +1046,7 @@ public class ProductServiceImpl implements ProductService {
                     .watermarkDetectResponse(watermarkDetectResponse)
                     .detectStatus(detectStatus)
                     .watermarkBase64(watermarkBase64)
+                    .extractedWatermarkBase64(extractedWatermarkBase64)
                     .build();
 
                 log.info("About to save watermark detection history: productId={}, storeName={}, watermarkId={}, imageIndex={}", 

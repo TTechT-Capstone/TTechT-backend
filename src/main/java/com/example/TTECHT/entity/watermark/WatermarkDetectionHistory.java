@@ -51,4 +51,7 @@ public class WatermarkDetectionHistory {
 
    @Column(name = "watermark_base64", columnDefinition = "TEXT")
    private String watermarkBase64;
+
+   @Column(name = "extracted_watermark_base64", columnDefinition = "TEXT")
+   private String extractedWatermarkBase64;
 }
