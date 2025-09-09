@@ -29,13 +29,21 @@ public interface OrderMapper {
     @Mapping(target = "orderStatus", ignore = true)
     @Mapping(target = "paymentMethod", ignore = true)
     @Mapping(target = "orderItems", ignore = true)
+    @Mapping(target = "cancellationReason", ignore = true)
+    @Mapping(target = "cancelledAt", ignore = true)
+    @Mapping(target = "cancelledBy", ignore = true)
     Order toOrder(OrderCreationRequest request);
 
     @Mapping(target = "id", source = "orderItemId")
     @Mapping(target = "productName", source = "product.name")
-    @Mapping(target = "stockCode", ignore = true)
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(target = "price", source = "price")
+    @Mapping(target = "quantity", source = "quantity")
+    @Mapping(target = "discountPrice", source = "discountPrice")
+    @Mapping(target = "stockCode", source = "stockCode")
+    @Mapping(target = "selectedColor", source = "selectedColor")
+    @Mapping(target = "selectedSize", source = "selectedSize")
+    @Mapping(target = "createdBy", expression = "java(orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().toString() : null)")
+    @Mapping(target = "updatedBy", expression = "java(orderItem.getUpdatedAt() != null ? orderItem.getUpdatedAt().toString() : null)")
     OrderItemReponse toOrderItemResponse(OrderItem orderItem);
 
     @Mapping(target = "id", source = "orderId")
@@ -51,6 +59,9 @@ public interface OrderMapper {
     @Mapping(target = "updatedBy", source = "updatedBy")
     @Mapping(target = "paymentMethod", source = "paymentMethod")
     @Mapping(target = "orderItems", source = "orderItems")
+    @Mapping(target = "cancellationReason", source = "cancellationReason")
+    @Mapping(target = "cancelledAt", expression = "java(order.getCancelledAt() != null ? order.getCancelledAt().toString() : null)")
+    @Mapping(target = "cancelledBy", source = "cancelledBy")
     OrderResponse toOrderResponse(Order order);
 
 }

@@ -1,16 +1,19 @@
 package com.example.TTECHT.service.impl;
 
 import com.example.TTECHT.constant.OrderConstants;
-import com.example.TTECHT.dto.repsonse.OrderItemReponse;
-import com.example.TTECHT.dto.repsonse.OrderResponse;
+import com.example.TTECHT.dto.repsonse.*;
+import com.example.TTECHT.dto.request.CancelOrderRequest;
 import com.example.TTECHT.dto.request.OrderCreationRequest;
+import com.example.TTECHT.dto.request.SellerOrderFilterRequest;
 import com.example.TTECHT.dto.request.UpdateOrderStatusRequest;
 import com.example.TTECHT.entity.Product;
 import com.example.TTECHT.entity.cart.Cart;
 import com.example.TTECHT.entity.cart.CartItem;
 import com.example.TTECHT.entity.order.Order;
 import com.example.TTECHT.entity.order.OrderItem;
+import com.example.TTECHT.entity.user.Role;
 import com.example.TTECHT.entity.user.User;
+import com.example.TTECHT.enumuration.CancellationReason;
 import com.example.TTECHT.enumuration.OrderStatus;
 import com.example.TTECHT.enumuration.PaymentMethod;
 import com.example.TTECHT.exception.AppException;
@@ -35,7 +38,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +55,29 @@ public class OrderServiceImpl implements OrderService {
     ProductRepository productRepository;
     OrderItemRepository orderItemRepository;
     OrderMapper orderMapper;
+
+    private static final Set<CancellationReason> CUSTOMER_REASONS = Set.of(
+            CancellationReason.CUSTOMER_CHANGED_MIND,
+            CancellationReason.FOUND_BETTER_PRICE,
+            CancellationReason.NO_LONGER_NEEDED,
+            CancellationReason.ORDERED_WRONG_ITEM,
+            CancellationReason.ORDERED_WRONG_SIZE,
+            CancellationReason.ORDERED_WRONG_COLOR,
+            CancellationReason.FINANCIAL_CONSTRAINTS,
+            CancellationReason.DELIVERY_TOO_SLOW,
+            CancellationReason.DELIVERY_TOO_EXPENSIVE,
+            CancellationReason.RECEIVED_AS_GIFT,
+            CancellationReason.PRODUCT_REVIEWS_NEGATIVE,
+            CancellationReason.STORE_POLICY_CONCERNS,
+            CancellationReason.PREFER_IN_STORE_PURCHASE,
+            CancellationReason.FAMILY_MEMBER_OBJECTION,
+            CancellationReason.BUDGET_REALLOCATED,
+            CancellationReason.IMPULSE_PURCHASE_REGRET,
+            CancellationReason.PRODUCT_AVAILABILITY_ELSEWHERE,
+            CancellationReason.PROMOTIONAL_OFFER_ENDED,
+            CancellationReason.CHANGE_OF_PLANS,
+            CancellationReason.OTHER
+    );
 
     @Transactional
     public OrderResponse createOrder(Long userId, Long cartId, OrderCreationRequest orderCreationRequest) {
@@ -207,11 +235,14 @@ public class OrderServiceImpl implements OrderService {
                         .price(item.getProduct().getPrice().doubleValue())
                         .discountPrice(OrderConstants.DEFAULT_DISCOUNT_PRICE)
                         .stockCode(OrderConstants.DEFAULT_STOCK_CODE)
+                        .selectedColor(item.getSelectedColor())
+                        .selectedSize(item.getSelectedSize())
                         .createdAt(now)
                         .updatedAt(now)
                         .build())
                 .collect(Collectors.toList());
         
+        log.info("Created {} order items with cart item attributes (color, size, images)", orderItems.size());
         return orderItemRepository.saveAll(orderItems);
     }
     
@@ -244,6 +275,8 @@ public class OrderServiceImpl implements OrderService {
                         .quantity(item.getQuantity())
                         .discountPrice(item.getDiscountPrice())
                         .stockCode(item.getStockCode())
+                        .selectedColor(item.getSelectedColor())
+                        .selectedSize(item.getSelectedSize())
                         .createdBy(item.getCreatedAt().toString())
                         .updatedBy(item.getUpdatedAt().toString())
                         .build())
@@ -305,11 +338,59 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    public void cancelOrder(Long orderId) {
+    public void cancelOrder(Long userId, Long orderId, CancelOrderRequest request) {
+        log.info("Cancelling order with ID: {} with reason: {}", orderId, request.getCancellationReason());
+        
+        User user = getUserById(userId);
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        
+        // Check if order can be cancelled (only if not already cancelled or completed)
+        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
+            log.error("Order with ID {} is already cancelled", orderId);
+            throw new AppException(ErrorCode.ORDER_ALREADY_CANCELLED);
+        }
+        
+        if (order.getOrderStatus() == OrderStatus.COMPLETED) {
+            log.error("Cannot cancel order with ID {} as it is already completed", orderId);
+            throw new AppException(ErrorCode.ORDER_CANNOT_BE_CANCELLED);
+        }
+
+        // Restore product stock when cancelling
+        restoreProductStockOnCancellation(order);
+        
+        // Update order status and cancellation details
         order.setOrderStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(CancellationReason.valueOf(request.getCancellationReason()));
+        order.setCancelledAt(LocalDateTime.now());
+        order.setCancelledBy(user.getRoles() != null ? user.getRoles().stream().map(Role::getName).collect(Collectors.joining(", ")) : "SYSTEM");
+        order.setUpdatedAt(LocalDateTime.now());
+        
         orderRepository.save(order);
+        
+        log.info("Successfully cancelled order with ID: {}", orderId);
+    }
+    
+    private void restoreProductStockOnCancellation(Order order) {
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+        List<Product> productsToUpdate = new ArrayList<>();
+        
+        for (OrderItem item : orderItems) {
+            Product product = item.getProduct();
+            int restoredStock = product.getStockQuantity() + item.getQuantity();
+            product.setStockQuantity(restoredStock);
+            productsToUpdate.add(product);
+            
+            log.info("Restored {} units of product ID: {} (new stock: {})", 
+                    item.getQuantity(), product.getProductId(), restoredStock);
+        }
+        
+        // Save all updated products in batch
+        if (!productsToUpdate.isEmpty()) {
+            productRepository.saveAll(productsToUpdate);
+            log.info("Restored stock for {} products after order cancellation", productsToUpdate.size());
+        }
     }
 
     @Transactional
@@ -337,6 +418,138 @@ public class OrderServiceImpl implements OrderService {
         return orders.stream()
                 .map(orderMapper::toOrderResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CancellationReasonResponse> getCustomerCancellationReasons() {
+        log.info("Fetching customer cancellation reasons");
+        return CUSTOMER_REASONS.stream()
+                .map(this::mapToResponse)
+                .sorted(Comparator.comparing(CancellationReasonResponse::getDescription))
+                .collect(Collectors.toList());
+    }
+
+    private CancellationReasonResponse mapToResponse(CancellationReason reason) {
+        String category = CUSTOMER_REASONS.contains(reason) ? "CUSTOMER" : "SYSTEM";
+
+        return CancellationReasonResponse.builder()
+                .code(reason.name())
+                .description(reason.getDescription())
+                .category(category)
+                .build();
+    }
+
+    @Override
+    public List<SellerOrderResponse> getOrdersForSeller(Long sellerId, SellerOrderFilterRequest filterRequest) {
+        log.info("Fetching filtered orders for seller ID: {} with filters: {}", sellerId, filterRequest);
+
+        // Validate seller exists
+        User seller = userRepository.findById(sellerId)
+                .orElseThrow(() -> new AppException(ErrorCode.SELLER_NOT_FOUND));
+
+        // Build query with filters
+        List<Order> filteredOrders = orderRepository.findOrdersForSellerWithFilters(
+                sellerId
+        );
+
+        return filteredOrders.stream()
+                .map(order -> mapToSellerOrderResponse(order, sellerId))
+                .sorted(getSellerOrderComparator(filterRequest))
+                .collect(Collectors.toList());
+    }
+
+    private SellerOrderResponse mapToSellerOrderResponse(Order order, Long sellerId) {
+        // Get only order items that belong to this seller
+        List<OrderItem> sellerOrderItems = orderItemRepository.findByOrderAndProductSellerId(order, sellerId);
+
+        // Calculate seller-specific totals
+        double sellerTotal = sellerOrderItems.stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity())
+                .sum();
+
+        int totalSellerItems = sellerOrderItems.stream()
+                .mapToInt(OrderItem::getQuantity)
+                .sum();
+
+        // Map order items to response DTOs
+        List<SellerOrderItemResponse> sellerOrderItemResponses = sellerOrderItems.stream()
+                .map(this::mapToSellerOrderItemResponse)
+                .collect(Collectors.toList());
+
+        // Build customer name
+        String customerName = order.getUser().getFirstName() + " " + order.getUser().getLastName();
+
+        return SellerOrderResponse.builder()
+                .orderId(order.getOrderId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getOrderStatus())
+                .contactName(order.getContactName())
+                .contactEmail(order.getContactEmail())
+                .contactPhone(order.getContactPhone())
+                .deliveryAddress(order.getDeliveryAddress())
+                .promotionCode(order.getPromotionCode())
+                .paymentMethod(order.getPaymentMethod())
+                .sellerTotal(sellerTotal)
+                .totalSellerItems(totalSellerItems)
+                .sellerOrderItems(sellerOrderItemResponses)
+                .cancellationReason(order.getCancellationReason())
+                .cancelledAt(order.getCancelledAt())
+                .cancelledBy(order.getCancelledBy())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .createdBy(order.getCreatedBy())
+                .updatedBy(order.getUpdatedBy())
+                .customerId(order.getUser().getId())
+                .customerName(customerName)
+                .build();
+    }
+
+    private SellerOrderItemResponse mapToSellerOrderItemResponse(OrderItem orderItem) {
+        Product product = orderItem.getProduct();
+        double totalPrice = orderItem.getPrice() * orderItem.getQuantity();
+
+        return SellerOrderItemResponse.builder()
+                .orderItemId(orderItem.getOrderItemId())
+                .productId(product.getProductId())
+                .productName(product.getName())
+                .productDescription(product.getDescription())
+                .brand(product.getBrand())
+                .storeName(product.getStoreName())
+                .quantity(orderItem.getQuantity())
+                .unitPrice(orderItem.getPrice())
+                .totalPrice(totalPrice)
+                .discountPrice(orderItem.getDiscountPrice())
+                .selectedColor(orderItem.getSelectedColor())
+                .selectedSize(orderItem.getSelectedSize())
+                .stockCode(orderItem.getStockCode())
+                .createdAt(orderItem.getCreatedAt())
+                .updatedAt(orderItem.getUpdatedAt())
+                .build();
+    }
+
+    private Comparator<SellerOrderResponse> getSellerOrderComparator(SellerOrderFilterRequest filterRequest) {
+        Comparator<SellerOrderResponse> comparator;
+
+        switch (filterRequest.getSortBy().toLowerCase()) {
+            case "ordernumber":
+                comparator = Comparator.comparing(SellerOrderResponse::getOrderNumber);
+                break;
+            case "sellertotal":
+                comparator = Comparator.comparing(SellerOrderResponse::getSellerTotal);
+                break;
+            case "customername":
+                comparator = Comparator.comparing(SellerOrderResponse::getCustomerName);
+                break;
+            case "orderstatus":
+                comparator = Comparator.comparing(order -> order.getOrderStatus().name());
+                break;
+            default:
+                comparator = Comparator.comparing(SellerOrderResponse::getCreatedAt);
+        }
+
+        return filterRequest.getSortDirection().equalsIgnoreCase("ASC")
+                ? comparator
+                : comparator.reversed();
     }
 }
 

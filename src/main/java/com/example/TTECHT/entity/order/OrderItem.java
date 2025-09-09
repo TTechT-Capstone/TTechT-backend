@@ -1,15 +1,7 @@
 package com.example.TTECHT.entity.order;
 
 import com.example.TTECHT.entity.Product;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Column;
-import jakarta.persistence.Table;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.FetchType;
+import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -51,4 +43,10 @@ public class OrderItem {
 
     @Column(name = "stock_code")
     private String stockCode;
+
+    @Column(name = "selected_color")
+    private String selectedColor;
+
+    @Column(name = "selected_size")
+    private String selectedSize;
 }

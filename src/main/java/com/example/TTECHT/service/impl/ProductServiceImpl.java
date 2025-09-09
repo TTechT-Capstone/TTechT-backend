@@ -479,6 +479,54 @@ public class ProductServiceImpl implements ProductService {
                 .map(this::convertToNewArrivalDTO)
                 .collect(Collectors.toList());
     }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getAllProductsWithoutPagination() {
+        List<Product> allProducts = productRepository.findAll();
+        
+        if (allProducts.isEmpty()) {
+            return List.of();
+        }
+        
+        // Optimize by bulk loading colors, sizes, and images for all products
+        List<Long> productIds = allProducts.stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+        
+        // Bulk load colors, sizes, and images for all products
+        Map<Long, List<String>> colorsMap = getColorsMapByProductIds(productIds);
+        Map<Long, List<String>> sizesMap = getSizesMapByProductIds(productIds);
+        Map<Long, List<String>> imagesMap = getImagesMapByProductIds(productIds);
+        
+        return allProducts.stream()
+                .map(product -> convertToDTOWithPreloadedData(product, colorsMap, sizesMap, imagesMap))
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getProductsByUserId(Long userId) {
+        List<Product> userProducts = productRepository.findBySellerIdOrderByCreatedAtDesc(userId);
+        
+        if (userProducts.isEmpty()) {
+            return List.of();
+        }
+        
+        // Optimize by bulk loading colors, sizes, and images for all products
+        List<Long> productIds = userProducts.stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+        
+        // Bulk load colors, sizes, and images for all products
+        Map<Long, List<String>> colorsMap = getColorsMapByProductIds(productIds);
+        Map<Long, List<String>> sizesMap = getSizesMapByProductIds(productIds);
+        Map<Long, List<String>> imagesMap = getImagesMapByProductIds(productIds);
+        
+        return userProducts.stream()
+                .map(product -> convertToDTOWithPreloadedData(product, colorsMap, sizesMap, imagesMap))
+                .collect(Collectors.toList());
+    }
 
     
     private ProductDTO convertToNewArrivalDTO(Product product) {
