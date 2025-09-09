@@ -16,6 +16,7 @@ public class WatermarkDetectedException extends RuntimeException {
     private final List<JsonNode> watermarkDetectResponses;
     private final List<String> detectStatuses;
     private final List<String> watermarkBase64s;
+    private final List<String> extractedWatermarkBase64s;
     private final String storeName;
     
     public WatermarkDetectedException(String message, String storeName) {
@@ -26,6 +27,7 @@ public class WatermarkDetectedException extends RuntimeException {
         this.watermarkDetectResponses = new ArrayList<>();
         this.detectStatuses = new ArrayList<>();
         this.watermarkBase64s = new ArrayList<>();
+        this.extractedWatermarkBase64s = new ArrayList<>();
         this.storeName = storeName;
     }
     
@@ -36,6 +38,7 @@ public class WatermarkDetectedException extends RuntimeException {
         this.watermarkDetectResponses.add(null);
         this.detectStatuses.add(null);
         this.watermarkBase64s.add(null);
+        this.extractedWatermarkBase64s.add(null);
     }
     
     public void addDetectedWatermark(String watermarkId, int imageIndex, String imageBase64) {
@@ -45,16 +48,19 @@ public class WatermarkDetectedException extends RuntimeException {
         this.watermarkDetectResponses.add(null);
         this.detectStatuses.add(null);
         this.watermarkBase64s.add(null);
+        this.extractedWatermarkBase64s.add(null);
     }
     
     public void addDetectedWatermark(String watermarkId, int imageIndex, String imageBase64, 
-                                   JsonNode watermarkDetectResponse, String detectStatus, String watermarkBase64) {
+                                   JsonNode watermarkDetectResponse, String detectStatus, String watermarkBase64,
+                                   String extractedWatermarkBase64) {
         this.detectedWatermarkIds.add(watermarkId);
         this.skippedImageIndexes.add(imageIndex);
         this.detectedImages.add(imageBase64);
         this.watermarkDetectResponses.add(watermarkDetectResponse);
         this.detectStatuses.add(detectStatus);
         this.watermarkBase64s.add(watermarkBase64);
+        this.extractedWatermarkBase64s.add(extractedWatermarkBase64);
     }
     
     public boolean hasDetections() {
