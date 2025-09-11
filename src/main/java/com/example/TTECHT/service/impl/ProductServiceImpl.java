@@ -669,7 +669,7 @@ public class ProductServiceImpl implements ProductService {
             log.info("Watermark embedding completed for image {}, response success: {}", 
                 imageIndex, watermarkResponse != null ? watermarkResponse.isSuccess() : "null");
             
-            saveWatermarkedImage(product, watermarkResponse, imageIndex);
+            saveWatermarkedImage(product, watermarkResponse, imageIndex, watermarkImageBase64);
         } catch (Exception e) {
             log.error("Error in embedding watermark for new image {}: {}", imageIndex, e.getMessage(), e);
             throw new RuntimeException("Failed to embed watermark for image " + imageIndex + ": " + e.getMessage());
@@ -679,7 +679,7 @@ public class ProductServiceImpl implements ProductService {
     /**
      * Save watermarked image to database
      */
-    private void saveWatermarkedImage(Product product, WatermarkEmbedResponseDTO watermarkResponse, int imageIndex) {
+    private void saveWatermarkedImage(Product product, WatermarkEmbedResponseDTO watermarkResponse, int imageIndex, String watermarkImageBase64) {
         if (watermarkResponse.isSuccess() && watermarkResponse.getData() != null) {
             ProductImage productImage = new ProductImage();
             productImage.setProduct(product); // Product is already managed
@@ -710,6 +710,13 @@ public class ProductServiceImpl implements ProductService {
             
             productImageRepository.save(productImage);
             log.info("Successfully processed and watermarked image {} for product {}", imageIndex, product.getProductId());
+
+            // Save success history with NOT_DETECTED status
+            try {
+                saveWatermarkSuccessHistory(product, imageIndex, watermarkImageBase64);
+            } catch (Exception historyEx) {
+                log.warn("Failed to save NOT_DETECTED watermark history for image {}: {}", imageIndex, historyEx.getMessage());
+            }
         } else {
             log.warn("Watermark service failed for image {}: {}", imageIndex, watermarkResponse.getMessage());
             throw new RuntimeException("Failed to process image " + imageIndex + ": " + watermarkResponse.getMessage());
@@ -865,6 +872,13 @@ public class ProductServiceImpl implements ProductService {
                 
                 productImageRepository.save(productImage);
                 log.info("Successfully processed and watermarked image {} for product {} (no existing watermark detected)", imageIndex, product.getProductId());
+
+                // Save success history with NOT_DETECTED status
+                try {
+                    saveWatermarkSuccessHistory(product, imageIndex, watermarkImageBase64);
+                } catch (Exception historyEx) {
+                    log.warn("Failed to save NOT_DETECTED watermark history for image {}: {}", imageIndex, historyEx.getMessage());
+                }
             } else {
                 log.warn("Watermark service failed for image {}: {}", imageIndex, watermarkResponse.getMessage());
                 throw new RuntimeException("Failed to process image " + imageIndex + ": " + watermarkResponse.getMessage());
@@ -872,6 +886,28 @@ public class ProductServiceImpl implements ProductService {
         } catch (Exception e) {
             log.error("Error in embedding watermark for image {} (no watermark detected): {}", imageIndex, e.getMessage(), e);
             throw new RuntimeException("Failed to embed watermark for image " + imageIndex + ": " + e.getMessage());
+        }
+    }
+
+    private void saveWatermarkSuccessHistory(Product product, int imageIndex, String watermarkBase64) {
+        try {
+            WatermarkDetectionHistory history = WatermarkDetectionHistory.builder()
+                .productId(product.getProductId())
+                .storeName(product.getStoreName())
+                .detectedImageBase64(null)
+                .detectionTimestamp(LocalDateTime.now())
+                .watermarkId(null)
+                .detectionMessage(String.format("No watermark detected; embedded new watermark in image %d", imageIndex))
+                .watermarkDetectResponse(null)
+                .detectStatus("NOT_DETECTED")
+                .watermarkBase64(watermarkBase64)
+                .extractedWatermarkBase64(null)
+                .build();
+
+            watermarkDetectionHistoryRepository.save(history);
+            log.info("Saved NOT_DETECTED watermark history for product {} image {}", product.getProductId(), imageIndex);
+        } catch (Exception e) {
+            log.warn("Failed to save NOT_DETECTED watermark history: {}", e.getMessage());
         }
     }
     
