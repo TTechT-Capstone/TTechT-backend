@@ -238,11 +238,26 @@ public class ProductServiceImpl implements ProductService {
         return convertToDTO(updatedProduct);
     }
 
+//    @Override
+//    public void deleteProduct(Long id) {
+//        Product product = findEntityById(id);
+//
+//        productImageRepository.deleteByProductProductId(id);
+//        productColorRepository.deleteByProductId(id);
+//        productSizeRepository.deleteByProductId(id);
+//
+//        // Colors and sizes will be deleted automatically due to cascade settings
+//        productRepository.delete(product);
+//    }
+
     @Override
+    @Transactional
     public void deleteProduct(Long id) {
         Product product = findEntityById(id);
-        // Colors and sizes will be deleted automatically due to cascade settings
+
         productRepository.delete(product);
+
+        log.info("Deleted product with ID {} (cascade deleted all related entities)", id);
     }
 
     @Override
